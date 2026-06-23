@@ -1,28 +1,46 @@
 name: market-radar
-
 on:
   schedule:
-    - cron: "0 22 * * *"
+    - cron: "0 21 * * 1-5"     # 평일 21:00 UTC (미 장마감 근처)
+    - cron: "30 22 * * 1-5"    # 데이터 늦게 뜰 때 보정
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write              # history 커밋백 위해 read→write
   pages: write
   id-token: write
+
+# 동시에 두 cron이 겹쳐 push 충돌나는 것 방지
+concurrency:
+  group: market-radar
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - run: pip install -r requirements.txt
+
       - name: collect
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python market_radar.py
+
+      - name: persist history
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase --autostash || true
+          git add radar_history.json
+          git commit -m "history $(date -u +%F_%H%M)" || echo "변동 없음"
+          git push || echo "푸시 스킵"
+
       - name: prepare site
         run: |
           mkdir -p _site
@@ -31,6 +49,7 @@ jobs:
           cp icon-192.png _site/ 2>/dev/null || true
           cp icon-512.png _site/ 2>/dev/null || true
           cp icon-180.png _site/ 2>/dev/null || true
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
