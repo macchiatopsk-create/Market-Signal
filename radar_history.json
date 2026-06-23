@@ -1,0 +1,20 @@
+[
+ {
+  "date": "2026-06-23",
+  "graded": false,
+  "sp_label": "STRONG BUY",
+  "sp_ratio": 79,
+  "sp_close": 733.58,
+  "sp_hit": null,
+  "nq_label": "STRONG BUY",
+  "nq_ratio": 76,
+  "nq_close": 713.65,
+  "nq_hit": null,
+  "sp_edge": "BEARISH",
+  "sp_edge_conf": "High",
+  "sp_edge_hit": null,
+  "nq_edge": "BEARISH",
+  "nq_edge_conf": "High",
+  "nq_edge_hit": null
+ }
+]
