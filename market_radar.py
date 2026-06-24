@@ -724,10 +724,12 @@ def SAMPLE_STATUS(n):
     return ("Building history" if n < 10 else "Early read" if n < 30
             else "Usable sample" if n < 100 else "Strong sample")
 
-def _observations(hist):
+def _observations(hist, only=None):
     obs = []
     for h in hist:
         for mk in ("sp", "nq"):
+            if only and mk != only:
+                continue
             if h.get(mk + "_ret1") is None:
                 continue
             obs.append(dict(score=h.get(mk + "_next_score"), ret=h.get(mk + "_ret1"),
@@ -764,8 +766,8 @@ def _inst_dir(o):
     t = o["inst"]
     return "bear" if t in ("RISK OFF", "STRESS") else "bull" if t == "RISK ON" else None
 
-def validation_tab(hist):
-    obs = _observations(hist)
+def _vsection(hist, mk, name):
+    obs = _observations(hist, mk)
     def fmt(sub):
         n, wr, ac, ao, rr = sub
         wrs = f"{wr}%" if wr is not None else "—"
@@ -775,15 +777,7 @@ def validation_tab(hist):
         return f'<span class="dval">n{n}·승{wrs}·C2C{acs}·O2C{aos}·R{rrs}</span>'
     def line(label, sub):
         return f'<div class="drow"><span>{label}</span>{fmt(sub)}</div>'
-
     n, wr, ac, ao, rr = _vstats(obs, _bias_dir)
-    overall = (f'<div class="edge-hero" style="--c:#46b1c9">'
-               f'<div class="hero-label">VALIDATION · OVERALL (Bias 방향)</div>'
-               f'<div class="bias-score" style="color:#46b1c9">{(str(wr)+"%") if wr is not None else "—"}'
-               f'<span class="bias-max"> 승률</span></div>'
-               f'<div class="edge-meta">표본 {n} · 평균 C2C {("%+.2f%%"%ac) if ac is not None else "—"} · O2C {("%+.2f%%"%ao) if ao is not None else "—"} · R {("%+.2f"%rr) if rr is not None else "—"} · <b>{SAMPLE_STATUS(n)}</b></div>'
-               f'<div class="edge-wr">C2C=종가→종가 · O2C=다음날 시가→종가(실매매 구간) · 부호 그대로(약세예측이면 −가 정상). 1건부터 표시.</div>'
-               f'</div>')
     score_rows = "".join(line(f"{nm} ({lo}~{hi})",
                           _vstats([o for o in obs if o["score"] is not None and lo <= o["score"] <= hi], _bias_dir))
                           for lo, hi, nm in BIAS_BUCKETS if nm != "Neutral")
@@ -792,12 +786,23 @@ def validation_tab(hist):
     inst_rows = "".join(line(t, _vstats([o for o in obs if o["inst"] == t], _inst_dir))
                         for t in ("RISK ON", "RISK OFF", "STRESS"))
     return f"""
-    {overall}
-    <div class="risk-card"><div class="rc-head" style="color:#46b1c9">점수 구간별 (Bias) — 점수일 때 실제 이동%</div>{score_rows}</div>
-    <div class="risk-card"><div class="rc-head" style="color:#46b1c9">CTA Validation</div>{cta_rows}</div>
-    <div class="risk-card"><div class="rc-head" style="color:#46b1c9">Institutional Validation</div>{inst_rows}</div>
-    <div class="note">방향: Bias≥56 · CTA SELLING/FORCED · Inst RISK OFF/STRESS = 하락 예측. C2C/O2C 는 raw 이동률이라
-    하락예측 구간은 −%가 적중. trade_r/TP/SL 채점은 Trade Plan Box 데이터 쌓이면 활성화. 표본 30건↑부터 의미.</div>
+    <div class="edge-hero" style="--c:#46b1c9">
+      <div class="hero-label">{name} · VALIDATION (Bias 방향)</div>
+      <div class="bias-score" style="color:#46b1c9">{(str(wr)+"%") if wr is not None else "—"}<span class="bias-max"> 승률</span></div>
+      <div class="edge-meta">표본 {n} · C2C {("%+.2f%%"%ac) if ac is not None else "—"} · O2C {("%+.2f%%"%ao) if ao is not None else "—"} · R {("%+.2f"%rr) if rr is not None else "—"} · <b>{SAMPLE_STATUS(n)}</b></div>
+    </div>
+    <div class="risk-card"><div class="rc-head" style="color:#46b1c9">{name} · 점수 구간별 (실제 이동%)</div>{score_rows}</div>
+    <div class="risk-card"><div class="rc-head" style="color:#46b1c9">{name} · CTA</div>{cta_rows}</div>
+    <div class="risk-card"><div class="rc-head" style="color:#46b1c9">{name} · Institutional</div>{inst_rows}</div>
+    """
+
+def validation_tab(hist):
+    return f"""
+    {_vsection(hist, "sp", "S&P 500 · SPY")}
+    {_vsection(hist, "nq", "나스닥 · QQQ")}
+    <div class="note">SPY / QQQ 각각 따로 채점합니다. 방향: Bias≥56 · CTA SELLING/FORCED · Inst RISK OFF/STRESS = 하락 예측.
+    C2C=종가→종가 · O2C=다음날 시가→종가(부호 그대로 — 하락예측이면 −%가 적중). trade_r/TP/SL 채점은 Trade Plan Box 데이터 쌓이면 활성화.
+    지수별로 나누면 표본이 절반씩이라 수렴은 느리지만 더 정확합니다(30건↑부터 의미).</div>
     """
 
 # ===========================================================================
