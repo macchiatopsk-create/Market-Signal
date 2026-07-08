@@ -1,8 +1,4 @@
 {
- "2026-06-23": [
-  "SPY_bias_BEARISH EDGE",
-  "QQQ_bias_BEARISH EDGE"
- ],
  "2026-06-24": [
   "SPY_bias_BEARISH EDGE",
   "QQQ_bias_BEARISH EDGE"
@@ -31,6 +27,10 @@
   "QQQ_final_STRONG BUY"
  ],
  "2026-07-07": [
+  "SPY_final_STRONG BUY"
+ ],
+ "2026-07-08": [
+  "SPY_bias_BULLISH EDGE",
   "SPY_final_STRONG BUY"
  ]
 }
