@@ -439,6 +439,65 @@ INST_COLOR = {"RISK ON":"#3fb950","NEUTRAL":"#8b95a5","RISK OFF":"#f0813f","STRE
 CTA_COLOR  = {"CTA LONG":"#3fb950","CTA NEUTRAL":"#8b95a5","CTA SELLING":"#f0813f","CTA FORCED SELLING":"#f04747"}
 
 # ===========================================================================
+# BULL vs BEAR DESK — TradingAgents식 대립 구조를 결정론적으로 (LLM·비용 없음).
+#   기존 신호를 양측 데스크로 갈라 강도 합산 → winner + conviction(확신도).
+#   conviction 은 "양측이 얼마나 일방적이냐" = Bias 숫자가 못 보여주는 내부 분열도.
+# ===========================================================================
+def compute_debate(trend_sig, risk, inst):
+    label = trend_sig[0]
+    c = risk.get("cond", {})
+    bull = bear = 0; bull_r = []; bear_r = []
+    # 추세 데스크
+    if label == "STRONG BUY":   bull += 3; bull_r.append("추세 STRONG BUY")
+    elif label == "BUY":        bull += 2; bull_r.append("추세 BUY")
+    elif label == "STRONG SELL":bear += 3; bear_r.append("추세 STRONG SELL")
+    elif label == "SELL":       bear += 2; bear_r.append("추세 SELL")
+    # 구조 데스크
+    if c.get("w_bear"):         bear += 3; bear_r.append("Weekly 하락구조")
+    if c.get("d_bear"):         bear += 2; bear_r.append("Daily 하락구조")
+    if c.get("prev_low_break"): bear += 2; bear_r.append("전일저가 이탈")
+    if c.get("sweep"):          bear += 1; bear_r.append("유동성 스윕")
+    if c.get("premium_reject"): bear += 1; bear_r.append("Premium 거부")
+    if c.get("close_low") and c.get("red"): bear += 1; bear_r.append("종가 저가권")
+    if risk.get("tier") == "LOW": bull += 1; bull_r.append("구조 균열 없음")
+    if c.get("close_high"):     bull += 1; bull_r.append("종가 고가권")
+    if c.get("mid_recovery"):   bull += 1; bull_r.append("중간값 회복")
+    if c.get("zone") == "discount": bull += 1; bull_r.append("Discount 구간")
+    # 플로우 데스크 (기관)
+    it = inst.get("tier")
+    if it == "STRESS":      bear += 3; bear_r.append("기관 STRESS")
+    elif it == "RISK OFF":  bear += 2; bear_r.append("기관 RISK OFF")
+    elif it == "RISK ON":   bull += 2; bull_r.append("기관 RISK ON")
+    if c.get("credit_off"): bear += 1; bear_r.append("신용 위험회피")
+    if c.get("credit_on"):  bull += 1; bull_r.append("신용 우호")
+    if c.get("iwm_weak"):   bear += 1; bear_r.append("소형주 약세")
+    if c.get("iwm_strong"): bull += 1; bull_r.append("소형주 강세")
+    # 모멘텀 데스크 (CTA)
+    ct = inst.get("cta", {}).get("tier")
+    if ct == "CTA FORCED SELLING": bear += 3; bear_r.append("CTA 강제청산")
+    elif ct == "CTA SELLING":      bear += 2; bear_r.append("CTA 매도")
+    elif ct == "CTA LONG":         bull += 2; bull_r.append("CTA 롱")
+
+    total = bull + bear
+    if total < 2:
+        return dict(bull=bull, bear=bear, winner="QUIET", dominance=0.0, conviction="QUIET",
+                    bull_reasons=bull_r, bear_reasons=bear_r, sizing="관망 (신호 약함)")
+    if bull == bear:
+        winner, dom, conv = "SPLIT", 0.5, "CONTESTED"
+    else:
+        winner = "BULL" if bull > bear else "BEAR"
+        dom = max(bull, bear) / total
+        conv = "DECISIVE" if dom >= 0.75 else "CLEAR" if dom >= 0.60 else "CONTESTED"
+    dirword = "숏" if winner == "BEAR" else "롱" if winner == "BULL" else "—"
+    sizing = {"DECISIVE": f"{dirword} 표준 사이즈 (한쪽 압도)",
+              "CLEAR":    f"{dirword} 표준~축소",
+              "CONTESTED":"축소 1/3~1/2 (양측 대립 — 무리 금지)"}[conv]
+    return dict(bull=bull, bear=bear, winner=winner, dominance=round(dom, 2),
+                conviction=conv, bull_reasons=bull_r, bear_reasons=bear_r, sizing=sizing)
+
+CONV_COLOR = {"DECISIVE":"#2bd47e","CLEAR":"#46b1c9","CONTESTED":"#f0813f","QUIET":"#6b7889"}
+
+# ===========================================================================
 # NEXT DAY BIAS SCORE — 0~100 점수형. 기권 안 함, 점수로만 표현.
 #   50 기준. Bearish 조건 가산 / Bullish 조건 감산. Inside Day 는 50쪽으로 당김.
 #   0~25 BULLISH EDGE · 26~45 MILD BULLISH · 46~55 NEUTRAL · 56~75 MILD BEARISH · 76~100 BEARISH EDGE
@@ -649,7 +708,9 @@ def verdict_color(v):
 # ===========================================================================
 def load_hist():
     try:
-        with open(HIST_PATH, encoding="utf-8") as f: return json.load(f)
+        with open(HIST_PATH, encoding="utf-8") as f:
+            j = json.load(f)
+        return j["days"] if isinstance(j, dict) else j   # 신형 {"days":[...],"backtest":{...}} / 구형 리스트 둘 다 지원
     except: return []
 
 def _regrade(hist):
@@ -695,6 +756,7 @@ def grade_and_record(hist, today, pred):
             mk + "_trend_score": d["trend_score"], mk + "_risk_score": d["risk_score"],
             mk + "_inst_tier": d["inst_tier"], mk + "_inst_stress": d["inst_stress"],
             mk + "_cta_score": d["cta_score"], mk + "_cta_tier": d["cta_tier"], mk + "_final": d["final"],
+            mk + "_conviction": d.get("conviction"), mk + "_dwinner": d.get("dwinner"),
             mk + "_close": d["close"], mk + "_open": d["open"], mk + "_high": d["high"], mk + "_low": d["low"],
             mk + "_atr": d["atr"],
             mk + "_next_hit": None, mk + "_dir_hit": None, mk + "_r": None,
@@ -734,7 +796,8 @@ def _observations(hist, only=None):
                 continue
             obs.append(dict(score=h.get(mk + "_next_score"), ret=h.get(mk + "_ret1"),
                             oc=h.get(mk + "_oc1"), atr=h.get(mk + "_atr"),
-                            cta=h.get(mk + "_cta_tier"), inst=h.get(mk + "_inst_tier")))
+                            cta=h.get(mk + "_cta_tier"), inst=h.get(mk + "_inst_tier"),
+                            conv=h.get(mk + "_conviction")))
     return obs
 
 def _vstats(obs, dir_fn):
@@ -785,6 +848,8 @@ def _vsection(hist, mk, name):
                        for t in ("CTA LONG", "CTA SELLING", "CTA FORCED SELLING"))
     inst_rows = "".join(line(t, _vstats([o for o in obs if o["inst"] == t], _inst_dir))
                         for t in ("RISK ON", "RISK OFF", "STRESS"))
+    conv_rows = "".join(line(t, _vstats([o for o in obs if o.get("conv") == t], _bias_dir))
+                        for t in ("DECISIVE", "CLEAR", "CONTESTED"))
     return f"""
     <div class="edge-hero" style="--c:#46b1c9">
       <div class="hero-label">{name} · VALIDATION (Bias 방향)</div>
@@ -792,6 +857,7 @@ def _vsection(hist, mk, name):
       <div class="edge-meta">표본 {n} · C2C {("%+.2f%%"%ac) if ac is not None else "—"} · O2C {("%+.2f%%"%ao) if ao is not None else "—"} · R {("%+.2f"%rr) if rr is not None else "—"} · <b>{SAMPLE_STATUS(n)}</b></div>
     </div>
     <div class="risk-card"><div class="rc-head" style="color:#46b1c9">{name} · 점수 구간별 (실제 이동%)</div>{score_rows}</div>
+    <div class="risk-card"><div class="rc-head" style="color:#46b1c9">{name} · 확신도별 (DESK 우세도)</div>{conv_rows}</div>
     <div class="risk-card"><div class="rc-head" style="color:#46b1c9">{name} · CTA</div>{cta_rows}</div>
     <div class="risk-card"><div class="rc-head" style="color:#46b1c9">{name} · Institutional</div>{inst_rows}</div>
     """
@@ -820,9 +886,26 @@ def build_tab_data(ticker, trend_sig, risk, inst):
     label, score100, detail, close = trend_sig
     bias = compute_next_day_bias(risk)
     fscore, fsig, why = compute_final(score100, risk["tier"], inst)
+    debate = compute_debate(trend_sig, risk, inst)
     return dict(ticker=ticker, label=label, score=score100, detail=detail, close=close, risk=risk,
                 inst=inst, bias=bias, fscore=fscore, fsig=fsig, why=why,
-                fcolor=FINAL_COLOR.get(fsig, "#8b95a5"))
+                fcolor=FINAL_COLOR.get(fsig, "#8b95a5"), debate=debate)
+
+def debate_card(deb):
+    winner = deb["winner"]; conv = deb["conviction"]
+    col = "#f04747" if winner == "BEAR" else "#2bd47e" if winner == "BULL" else "#8b95a5"
+    ccol = CONV_COLOR.get(conv, "#8b95a5")
+    bear_li = "".join(f"<li>{r}</li>" for r in deb["bear_reasons"]) or "<li>—</li>"
+    bull_li = "".join(f"<li>{r}</li>" for r in deb["bull_reasons"]) or "<li>—</li>"
+    verdict = {"BULL": "BULL WINS", "BEAR": "BEAR WINS", "SPLIT": "SPLIT (대립)", "QUIET": "QUIET"}[winner]
+    return f"""<div class="risk-card">
+      <div class="rc-head" style="color:{col}">BULL vs BEAR DESK — {verdict}</div>
+      <div class="desk"><div class="desk-h" style="color:#f04747">🐻 BEAR · 강도 {deb['bear']}</div><ul class="edge-list">{bear_li}</ul></div>
+      <div class="desk"><div class="desk-h" style="color:#2bd47e">🐂 BULL · 강도 {deb['bull']}</div><ul class="edge-list">{bull_li}</ul></div>
+      <div class="debate-verdict">확신도 <b style="color:{ccol}">{conv}</b> · 우세도 {int(deb['dominance']*100)}%</div>
+      <div class="edge-act" style="font-size:14px;">권장: {deb['sizing']}</div>
+      <div class="tp-foot">사이징은 참고용 가이드일 뿐 투자조언이 아닙니다. 본인 판단·리스크 관리 필수.</div>
+    </div>"""
 
 def bias_card(bias, buckets):
     s = bias["score"]
@@ -886,6 +969,7 @@ def signal_tab(name, d, buckets):
       </div>
       <div class="sig-meta">위험 {risk['tier']} {risk['score']} · 기관 {inst['tier']} · {inst['cta']['tier']} · 종가 {risk['close']} ({risk['change']:+.1f}%)</div>
     </div>
+    {debate_card(d['debate'])}
     <div class="tradeplan" id="tp-{d['ticker']}">
       <div class="tp-bar"><span class="hero-label">TRADE PLAN — Live Intraday</span><button class="tp-enable">🔔 알림</button></div>
       <div class="tp-body"><div class="tp-note">장중 데이터 불러오는 중…</div></div>
@@ -1092,7 +1176,8 @@ function notifyLocal(ticker, status){
 async function updateTradePlan(ticker){
   const box = document.getElementById("tp-"+ticker); if (!box) return;
   const body = box.querySelector(".tp-body");
-  const res = await fetchChart(ticker);
+  let res = await fetchChart(ticker);
+  if (!res){ await new Promise(r => setTimeout(r, 1500)); res = await fetchChart(ticker); }  // 1회 재시도
   const s = res ? buildSession(res) : null;
   if (!s){ body.innerHTML = '<div class="tp-note">Intraday data unavailable. Use EOD bias only.</div>'; return; }
   const p = computePlan(ticker, s);
@@ -1100,7 +1185,12 @@ async function updateTradePlan(ticker){
   box.style.borderLeftColor = statusColor(p.status);
   if (isRegularSession() && (p.status.indexOf("ACTIVE")>=0 || p.status.indexOf("CHASE")>=0)) notifyLocal(ticker, p.status);
 }
-function refreshTradePlans(){ TP_TICKERS.forEach(updateTradePlan); }
+async function refreshTradePlans(){
+  for (const t of TP_TICKERS){
+    await updateTradePlan(t);
+    await new Promise(r => setTimeout(r, 900));   // 프록시 동시 호출 충돌(레이트리밋) 방지
+  }
+}
 document.querySelectorAll(".tp-enable").forEach(btn=>btn.addEventListener("click",()=>{
   if ("Notification" in window) Notification.requestPermission();
 }));
@@ -1110,6 +1200,134 @@ setInterval(refreshTradePlans, 60000);
 
 def tradeplan_script(tp_data):
     return "<script>" + TRADEPLAN_JS.replace("__DASHBOARD_BIAS__", json.dumps(tp_data)) + "</script>"
+
+# ===========================================================================
+# 내장 백테스트 — 프로덕션 공식 그대로 3y point-in-time. 실패해도 대시보드 무영향.
+#   결과는 dashboard.html 하단에 접이식 리포트 + JSON 으로 임베드 (Pages 로 발행됨)
+#   주의: in-sample (가중치를 최근 장 보며 정함) — 낙관 편향 가능. 라이브로 재확인 필요.
+# ===========================================================================
+def _wilson(hits, n, z=1.96):
+    import math
+    if n == 0: return (None, None)
+    p = hits / n; den = 1 + z*z/n
+    c = (p + z*z/(2*n)) / den
+    m = z*math.sqrt((p*(1-p) + z*z/(4*n))/n) / den
+    return (round((c-m)*100, 1), round((c+m)*100, 1))
+
+def run_backtest():
+    global trend, yf_ohlc
+    orig_trend, orig_yf = trend, yf_ohlc
+    try:
+        data = {}
+        for tk in ("SPY", "QQQ"):
+            data[tk] = yf.Ticker(tk).history(period="3y")[["Open", "High", "Low", "Close", "Volume"]].dropna()
+        closes = {}
+        for tk in ("IWM","HYG","IEF","LQD","RSP","QQEW","XLY","XLP","XLU","KRE","XLF","^VIX","^VIX3M"):
+            try: closes[tk] = yf.Ticker(tk).history(period="3y")["Close"].dropna()
+            except Exception: closes[tk] = None
+        spy = data["SPY"]; idx = spy.index; N = len(idx)
+        al = {k: (v.reindex(idx).ffill() if v is not None else None) for k, v in closes.items()}
+        data["QQQ"] = data["QQQ"].reindex(idx).ffill()
+        vix = al["^VIX"]; vix3 = al["^VIX3M"]
+        START = 260
+        if N - 1 - START < 60:
+            raise ValueError(f"백테스트 표본 부족 (거래일 {N})")
+
+        def rdiff(a, b, t, n=20):
+            ra = al.get(a) if al.get(a) is not None else (data[a]["Close"] if a in data else spy["Close"])
+            rb = al.get(b) if al.get(b) is not None else (data[b]["Close"] if b in data else spy["Close"])
+            r = (ra / rb).iloc[:t+1].dropna()
+            if len(r) < n + 1: n = len(r) - 1
+            return float(r.iloc[-1] - r.iloc[-1-n])
+
+        obs = {"SPY": [], "QQQ": []}
+        for t in range(START, N - 1):
+            v_t = float(vix.iloc[t]) if vix is not None and vix.iloc[t] == vix.iloc[t] else None
+            v3_t = float(vix3.iloc[t]) if vix3 is not None and vix3.iloc[t] == vix3.iloc[t] else None
+            macro = {"vix": v_t, "vix3m": v3_t}
+            trend = lambda a, b, n=20, _t=t: rdiff(a, b, _t, n)
+            market = dict(iwm_weak=rdiff("IWM","SPY",t) < 0, iwm_strong=rdiff("IWM","SPY",t) > 0,
+                          credit_off=rdiff("HYG","IEF",t) < 0, credit_on=rdiff("HYG","IEF",t) > 0,
+                          vix_up=bool(vix.iloc[t] > vix.iloc[t-1]) if v_t is not None else None)
+            ms = compute_market_stress(macro, spy.iloc[:t+1])
+            for tk in ("SPY", "QQQ"):
+                df = data[tk]; sl = df.iloc[:t+1]
+                yf_ohlc = lambda *a, _sl=sl, **k: _sl
+                try:
+                    risk = compute_risk_bias(tk, macro, market)
+                    inst = finalize_institutional(ms, sl)
+                    risk["cond"]["institutional_tier"] = inst["tier"]
+                    risk["cond"]["cta_tier"] = inst["cta"]["tier"]
+                    b = compute_next_day_bias(risk)
+                except Exception:
+                    continue
+                c0 = float(df["Close"].iloc[t]); c1 = float(df["Close"].iloc[t+1]); o1 = float(df["Open"].iloc[t+1])
+                obs[tk].append(dict(d=str(idx[t].date()), s=b["score"], c=(c1/c0-1)*100, o=(c1/o1-1)*100,
+                                    cta=inst["cta"]["tier"], it=inst["tier"], v=v_t))
+
+        ACCT = 2000.0
+        def sized(s):
+            if s <= 25: return ACCT
+            if s <= 45: return ACCT/2
+            if s <= 55: return 0.0
+            if s <= 75: return -ACCT/2
+            return -ACCT
+        rep = [f"기간 {idx[START].date()} ~ {idx[N-2].date()} · in-sample 주의 · 비용 제외"]
+        out = {"period": [str(idx[START].date()), str(idx[N-2].date())], "tickers": {}}
+        for tk in ("SPY", "QQQ"):
+            rows = obs[tk]; R = {"n": len(rows), "buckets": {}, "cta": {}, "inst": {}, "regime": {}, "paper": {}}
+            rep.append(f"\n[{tk}] 표본 {len(rows)}일")
+            for lo, hi, nm in BIAS_BUCKETS:
+                sub = [r for r in rows if lo <= r["s"] <= hi]
+                if not sub: continue
+                if nm == "Neutral":
+                    rep.append(f"  {nm:12s} n={len(sub):3d} (채점 제외)"); R["buckets"][nm] = {"n": len(sub)}; continue
+                bear = lo >= 56
+                hits = sum(1 for r in sub if (r["c"] < 0) == bear)
+                wr = hits/len(sub)*100; ci = _wilson(hits, len(sub))
+                ac = sum(r["c"] for r in sub)/len(sub); ao = sum(r["o"] for r in sub)/len(sub)
+                rep.append(f"  {nm:12s} n={len(sub):3d} 승률 {wr:5.1f}% CI({ci[0]}~{ci[1]}) C2C{ac:+.3f}% O2C{ao:+.3f}%")
+                R["buckets"][nm] = dict(n=len(sub), win=round(wr,1), ci=list(ci), c2c=round(ac,3), o2c=round(ao,3))
+            for key, bears, bulls in (("cta", ("CTA SELLING","CTA FORCED SELLING"), ("CTA LONG",)),
+                                       ("it", ("RISK OFF","STRESS"), ("RISK ON",))):
+                for tier in sorted(set(r[key] for r in rows)):
+                    sub = [r for r in rows if r[key] == tier]
+                    if tier in bears: hits = sum(1 for r in sub if r["c"] < 0)
+                    elif tier in bulls: hits = sum(1 for r in sub if r["c"] > 0)
+                    else: continue
+                    wr = hits/len(sub)*100; ci = _wilson(hits, len(sub))
+                    ac = sum(r["c"] for r in sub)/len(sub)
+                    rep.append(f"  {tier:19s} n={len(sub):3d} 승률 {wr:5.1f}% CI({ci[0]}~{ci[1]}) C2C{ac:+.3f}%")
+                    R["cta" if key == "cta" else "inst"][tier] = dict(n=len(sub), win=round(wr,1), ci=list(ci), c2c=round(ac,3))
+            for nm, fn in (("VIX<20", lambda v: v is not None and v < 20), ("VIX>=20", lambda v: v is not None and v >= 20)):
+                sub = [r for r in rows if fn(r["v"]) and (r["s"] >= 56 or r["s"] <= 45)]
+                if not sub: continue
+                hits = sum(1 for r in sub if (r["c"] < 0) == (r["s"] >= 56))
+                wr = hits/len(sub)*100; ci = _wilson(hits, len(sub))
+                rep.append(f"  레짐 {nm:8s} n={len(sub):3d} 승률 {wr:5.1f}% CI({ci[0]}~{ci[1]})")
+                R["regime"][nm] = dict(n=len(sub), win=round(wr,1), ci=list(ci))
+            eq = ACCT; peak = ACCT; mdd = 0.0; wd = ld = 0.0; wn = ln_ = fl = 0
+            for r in rows:
+                pnl = sized(r["s"]) * r["o"] / 100.0
+                eq += pnl; peak = max(peak, eq); mdd = min(mdd, eq - peak)
+                if sized(r["s"]) == 0: fl += 1
+                elif pnl > 0: wn += 1; wd += pnl
+                elif pnl < 0: ln_ += 1; ld += pnl
+            R["paper"] = dict(final=round(eq,2), pnl=round(eq-ACCT,2), wins=wn, losses=ln_, flat=fl,
+                              win_sum=round(wd,2), loss_sum=round(ld,2), max_dd=round(mdd,2))
+            rep.append(f"  페이퍼($2,000·O2C) 최종 ${eq:,.2f} ({eq-ACCT:+,.2f}) WIN {wn}일 +{wd:,.2f} LOSS {ln_}일 {ld:,.2f} MaxDD {mdd:,.2f}")
+            out["tickers"][tk] = R
+        return "\n".join(rep), out
+    finally:
+        trend, yf_ohlc = orig_trend, orig_yf
+
+def backtest_block(txt, data):
+    if not txt:
+        return ""
+    esc = txt.replace("&", "&amp;").replace("<", "&lt;")
+    return (f'<details class="trend-fold" style="margin-top:20px"><summary>백테스트 리포트 (point-in-time · in-sample)</summary>'
+            f'<pre style="font-size:11px;line-height:1.6;color:#8b95a5;overflow-x:auto;padding:10px">{esc}</pre></details>'
+            f'<script type="application/json" id="backtest-json">{json.dumps(data, ensure_ascii=False)}</script>')
 
 def render(rtab, sptab, nqtab, vtab, now, errors, tp_js=""):
     err = ""
@@ -1181,6 +1399,9 @@ h1{{font-family:'Oswald',sans-serif;font-weight:500;font-size:clamp(26px,7vw,38p
 .tp-plan .tp-v{{color:var(--teal);font-weight:600;}}
 .tp-note{{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);margin-top:8px;line-height:1.5;}}
 .tp-foot{{font-size:10px;color:var(--dim);margin-top:10px;border-top:1px solid var(--border);padding-top:8px;}}
+.desk{{margin-top:8px;}}
+.desk-h{{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;margin-bottom:4px;}}
+.debate-verdict{{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--text);margin-top:10px;border-top:1px dashed var(--border);padding-top:8px;}}
 .risk-card{{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 16px;margin-bottom:12px;}}
 .rc-head{{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.04em;padding:10px 0 6px;border-bottom:1px solid var(--border);text-transform:uppercase;}}
 .winrate{{display:flex;justify-content:space-between;align-items:center;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:13px 16px;margin-bottom:12px;}}
@@ -1364,14 +1585,29 @@ def main():
                     trend_score=trend_sig[1], risk_score=risk["score"],
                     inst_tier=inst["tier"], inst_stress=inst["stress"],
                     cta_score=inst["cta"]["score"], cta_tier=inst["cta"]["tier"], final=d["fsig"],
+                    conviction=d["debate"]["conviction"], dwinner=d["debate"]["winner"],
                     close=risk["close"], open=risk["open"], high=risk["high"], low=risk["low"], atr=risk["atr"])
     pred = {"sp": _pred(spd, sp, sp_risk, inst_sp), "nq": _pred(nqd, nq, nq_risk, inst_nq)}
 
     today = dt.datetime.now(NY).strftime("%Y-%m-%d")          # 거래일 기준 뉴욕
     hist = load_hist()
     hist = grade_and_record(hist, today, pred)
+
+    bt_txt = ""; bt_data = {}
+    if os.environ.get("BACKTEST", "1") != "0":       # BACKTEST=0 이면 스킵 (기본: 매 실행)
+        try:
+            print("  백테스트 실행 중 (3y point-in-time)...", flush=True)
+            bt_txt, bt_data = run_backtest()
+            print("  백테스트 완료")
+        except Exception as ex:
+            errors["backtest"] = str(ex)
+
+    # history 파일에 백테스트 결과 동봉 → 기존 워크플로가 그대로 커밋 (yml 수정 불필요)
     with open(HIST_PATH, "w", encoding="utf-8") as f:
-        json.dump(hist, f, ensure_ascii=False, indent=1)
+        json.dump({"days": hist,
+                   "backtest": {"at": dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET"),
+                                 "report": bt_txt, "data": bt_data}},
+                  f, ensure_ascii=False, indent=1)
 
     now = dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET")
     rtab  = risk_tab(rvals, rst, lvl, red, amber)
@@ -1385,7 +1621,7 @@ def main():
                     prevHigh=nq_risk["high"], prevLow=nq_risk["low"], prevClose=nq_risk["close"], refDate=today),
     }
     tp_js = tradeplan_script(tp_data)
-    html = render(rtab, sptab, nqtab, vtab, now, errors, tp_js)
+    html = render(rtab, sptab, nqtab, vtab, now, errors, tp_js + backtest_block(bt_txt, bt_data))
     with open(OUT_HTML, "w", encoding="utf-8") as f:
         f.write(html)
     write_pwa_assets()
