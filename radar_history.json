@@ -772,7 +772,7 @@
   }
  ],
  "backtest": {
-  "at": "2026-07-09 20:15 ET",
+  "at": "2026-07-09 20:27 ET",
   "report": "기간 2024-07-22 ~ 2026-07-08 · in-sample 주의 · 비용 제외\n\n[SPY] 표본 492일\n  Bullish Edge n= 73 승률  67.1% CI(55.7~76.8) C2C+0.231% O2C+0.113%\n  Mild Bullish n=147 승률  53.1% CI(45.0~60.9) C2C+0.016% O2C+0.010%\n  Neutral      n= 57 (채점 제외)\n  Mild Bearish n=110 승률  50.9% CI(41.7~60.1) C2C-0.080% O2C-0.086%\n  Bearish Edge n=105 승률  39.0% CI(30.3~48.6) C2C+0.202% O2C+0.122%\n  CTA FORCED SELLING  n= 23 승률  30.4% CI(15.6~50.9) C2C+0.336%\n  CTA LONG            n=296 승률  54.4% CI(48.7~60.0) C2C+0.035%\n  CTA SELLING         n= 20 승률  35.0% CI(18.1~56.7) C2C+0.211%\n  RISK OFF            n=193 승률  50.3% CI(43.3~57.2) C2C-0.071%\n  RISK ON             n= 22 승률  59.1% CI(38.7~76.7) C2C+0.267%\n  STRESS              n= 59 승률  32.2% CI(21.7~44.9) C2C+0.340%\n  페이퍼($2,000·O2C) 최종 $2,180.29 (+180.29) WIN 121일 +670.39 LOSS 98일 -490.10 MaxDD -60.22\n\n[QQQ] 표본 492일\n  Bullish Edge n= 67 승률  68.7% CI(56.8~78.5) C2C+0.329% O2C+0.119%\n  Mild Bullish n=156 승률  55.8% CI(47.9~63.3) C2C+0.055% O2C+0.012%\n  Neutral      n= 52 (채점 제외)\n  Mild Bearish n=114 승률  43.9% CI(35.1~53.0) C2C+0.061% O2C-0.041%\n  Bearish Edge n=103 승률  42.7% CI(33.6~52.4) C2C+0.219% O2C+0.131%\n  CTA FORCED SELLING  n= 16 승률  43.8% CI(23.1~66.8) C2C+0.368%\n  CTA LONG            n=261 승률  55.9% CI(49.9~61.8) C2C+0.051%\n  CTA SELLING         n= 26 승률  34.6% CI(19.4~53.8) C2C+0.357%\n  RISK OFF            n=191 승률  50.3% CI(43.2~57.3) C2C-0.098%\n  RISK ON             n= 21 승률  61.9% CI(40.9~79.2) C2C+0.298%\n  STRESS              n= 62 승률  38.7% CI(27.6~51.2) C2C+0.398%\n  페이퍼($2,000·O2C) 최종 $2,178.11 (+178.11) WIN 127일 +933.13 LOSS 96일 -755.02 MaxDD -145.35",
   "data": {
    "period": [
