@@ -1367,7 +1367,8 @@ def run_backtest():
             u2 = up.rolling(2).mean(); d2 = dn.rolling(2).mean()
             rsi2 = 100 - 100 / (1 + u2 / d2.replace(0, 1e-12))
             down2 = (px < px.shift(1)) & (px.shift(1) < px.shift(2))
-            pre[tk] = dict(ma200=ma200, rsi2=rsi2, down2=down2)
+            vol = data[tk]["Volume"]; v20 = vol.rolling(20).mean()
+            pre[tk] = dict(ma200=ma200, rsi2=rsi2, down2=down2, vr=vol / v20)
         _r = spy["Close"].pct_change()
         _rv20 = _r.rolling(20).std(); _rvmed = _rv20.rolling(100).median()
         hi_vol = (_rv20 > _rvmed)
@@ -1396,7 +1397,9 @@ def run_backtest():
                 c0 = float(df["Close"].iloc[t]); c1 = float(df["Close"].iloc[t+1]); o1 = float(df["Open"].iloc[t+1])
                 c2v = float(df["Close"].iloc[t+2]) if t + 2 < N else None
                 pma = pre[tk]["ma200"].iloc[t]; prs = pre[tk]["rsi2"].iloc[t]
+                pvr = pre[tk]["vr"].iloc[t]
                 obs[tk].append(dict(d=str(idx[t].date()), s=b["score"], c=(c1/c0-1)*100, o=(c1/o1-1)*100,
+                                    vr=(float(pvr) if pvr == pvr else 1.0), cond=dict(risk["cond"]),
                                     o2=((c2v/o1-1)*100 if c2v is not None else None),
                                     ma200=bool(c0 > pma) if pma == pma else False,
                                     dn2=bool(pre[tk]["down2"].iloc[t]),
@@ -1472,13 +1475,53 @@ def run_backtest():
                 ("H_D+Mild$500",     lambda r: (ACCT if r["s"]<=25 and r["ma200"] else 0)
                                               + (ACCT/2 if r["s"]>=76 and r["ma200"] else 0)
                                               + (ACCT/4 if 26 <= r["s"] <= 45 and r["ma200"] else 0), "o"),
+                ("I_H+투매볼륨",       lambda r: (ACCT if r["s"]<=25 and r["ma200"] else 0)
+                                              + (ACCT/2 if r["s"]>=76 and r["ma200"] and r["vr"] >= 1.5 else 0)
+                                              + (ACCT/4 if 26 <= r["s"] <= 45 and r["ma200"] else 0), "o"),
+                ("J_H+무기력하락",     lambda r: (ACCT if r["s"]<=25 and r["ma200"] and r["vr"] < 1.0 else 0)
+                                              + (ACCT/2 if r["s"]>=76 and r["ma200"] else 0)
+                                              + (ACCT/4 if 26 <= r["s"] <= 45 and r["ma200"] else 0), "o"),
             ]
+            cal_days = max((idx[N-2] - idx[START]).days, 1)
+            f365 = 365.0 / cal_days
+            R["annual_factor"] = round(f365, 4)
             R["variants"] = {}
-            rep.append("  ─ 변형 실험실 ($2,000·롱온리) ─")
+            rep.append(f"  ─ 변형 실험실 ($2,000·롱온리·365일 환산 ×{f365:.2f}) ─")
             for vnm, rule, fld in VAR:
                 st = _mk(rule, fld)
+                st["yr_trades"] = round(st["trades"] * f365); st["yr_pnl"] = round(st["pnl"] * f365, 2)
                 R["variants"][vnm] = st
-                rep.append(f"  {vnm:16s} n={st['trades']:3d} 손익 {st['pnl']:+8.2f} 승률 {st['winrate'] if st['winrate'] is not None else '—'}% MaxDD {st['max_dd']:.2f}")
+                rep.append(f"  {vnm:16s} 연{st['yr_trades']:3d}건 연손익 {st['yr_pnl']:+8.2f} 승률 {st['winrate'] if st['winrate'] is not None else '—'}% MaxDD {st['max_dd']:.2f}")
+            # ─ 절제분석: 조건 하나씩 끄고 H 재계산 → 연손익 변화 (프로덕션 bias 함수 재사용) ─
+            def _h_rule(s, ma):
+                if not ma: return 0.0
+                if s <= 25: return ACCT
+                if s <= 45: return ACCT/4
+                if s >= 76: return ACCT/2
+                return 0.0
+            def _h_pnl(score_fn):
+                eq3 = 0.0
+                for r in rows:
+                    if r.get("o") is None: continue
+                    eq3 += _h_rule(score_fn(r), r["ma200"]) * r["o"] / 100.0
+                return eq3
+            base_pnl = _h_pnl(lambda r: r["s"])
+            ABL = [("전일저가이탈", ["prev_low_break"]), ("Daily구조", ["d_bear"]), ("Weekly구조", ["w_bear"]),
+                   ("종가저가권", ["close_low"]), ("Premium거부", ["premium_reject"]), ("유동성스윕", ["sweep"]),
+                   ("IWM비율", ["iwm_weak", "iwm_strong"]), ("신용HYG/IEF", ["credit_off", "credit_on"]),
+                   ("VIX방향", ["vix_up_red", "vix_up"]), ("기관티어", ["institutional_tier"]),
+                   ("CTA티어", ["cta_tier"]), ("InsideDay", ["inside_day"]), ("종가고가권", ["close_high"]),
+                   ("중간값회복", ["mid_recovery"]), ("Discount존", ["zone"])]
+            R["ablation"] = {}
+            rep.append("  ─ 절제분석 (조건 제거 시 H 연손익 변화 · +면 빼도 됨) ─")
+            for anm, keys in ABL:
+                def _sc(r, _k=keys):
+                    c2 = dict(r["cond"])
+                    for k in _k: c2.pop(k, None)
+                    return compute_next_day_bias({"cond": c2})["score"]
+                d_pnl = (_h_pnl(_sc) - base_pnl) * f365
+                R["ablation"][anm] = round(d_pnl, 2)
+                rep.append(f"    -{anm:12s} {d_pnl:+8.2f}/yr")
             eq = ACCT; peak = ACCT; mdd = 0.0; wd = ld = 0.0; wn = ln_ = fl = 0
             for r in rows:
                 pnl = sized(r["s"], r.get("ma200", True)) * r["o"] / 100.0
