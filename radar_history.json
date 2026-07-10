@@ -772,8 +772,13 @@
   }
  ],
  "backtest": {
+<<<<<<< Updated upstream
   "at": "2026-07-09 20:07 ET",
   "report": "기간 2024-07-22 ~ 2026-07-08 · in-sample 주의 · 비용 제외\n\n[SPY] 표본 492일\n  Bullish Edge n= 73 승률  67.1% CI(55.7~76.8) C2C+0.231% O2C+0.113%\n  Mild Bullish n=147 승률  53.1% CI(45.0~60.9) C2C+0.016% O2C+0.010%\n  Neutral      n= 57 (채점 제외)\n  Mild Bearish n=110 승률  50.9% CI(41.7~60.1) C2C-0.080% O2C-0.086%\n  Bearish Edge n=105 승률  39.0% CI(30.3~48.6) C2C+0.202% O2C+0.122%\n  CTA FORCED SELLING  n= 23 승률  30.4% CI(15.6~50.9) C2C+0.336%\n  CTA LONG            n=296 승률  54.4% CI(48.7~60.0) C2C+0.035%\n  CTA SELLING         n= 20 승률  35.0% CI(18.1~56.7) C2C+0.211%\n  RISK OFF            n=193 승률  50.3% CI(43.3~57.2) C2C-0.071%\n  RISK ON             n= 22 승률  59.1% CI(38.7~76.7) C2C+0.267%\n  STRESS              n= 59 승률  32.2% CI(21.7~44.9) C2C+0.340%\n  페이퍼($2,000·O2C) 최종 $2,018.00 (+18.00) WIN 227일 +1,891.67 LOSS 207일 -1,873.66 MaxDD -314.37\n\n[QQQ] 표본 492일\n  Bullish Edge n= 67 승률  68.7% CI(56.8~78.5) C2C+0.329% O2C+0.119%\n  Mild Bullish n=156 승률  55.8% CI(47.9~63.3) C2C+0.055% O2C+0.012%\n  Neutral      n= 52 (채점 제외)\n  Mild Bearish n=114 승률  43.9% CI(35.1~53.0) C2C+0.061% O2C-0.041%\n  Bearish Edge n=103 승률  42.7% CI(33.6~52.4) C2C+0.219% O2C+0.131%\n  CTA FORCED SELLING  n= 16 승률  43.8% CI(23.1~66.8) C2C+0.368%\n  CTA LONG            n=261 승률  55.9% CI(49.9~61.8) C2C+0.051%\n  CTA SELLING         n= 26 승률  34.6% CI(19.4~53.8) C2C+0.357%\n  RISK OFF            n=191 승률  50.3% CI(43.2~57.3) C2C-0.098%\n  RISK ON             n= 21 승률  61.9% CI(40.9~79.2) C2C+0.298%\n  STRESS              n= 62 승률  38.7% CI(27.6~51.2) C2C+0.398%\n  페이퍼($2,000·O2C) 최종 $1,954.70 (-45.30) WIN 230일 +2,444.39 LOSS 210일 -2,489.70 MaxDD -424.38",
+=======
+  "at": "2026-07-09 20:08 ET",
+  "report": "기간 2024-07-22 ~ 2026-07-08 · in-sample 주의 · 비용 제외\n\n[SPY] 표본 492일\n  Bullish Edge n= 73 승률  67.1% CI(55.7~76.8) C2C+0.231% O2C+0.113%\n  Mild Bullish n=147 승률  53.1% CI(45.0~60.9) C2C+0.016% O2C+0.010%\n  Neutral      n= 56 (채점 제외)\n  Mild Bearish n=111 승률  50.5% CI(41.3~59.6) C2C-0.072% O2C-0.081%\n  Bearish Edge n=105 승률  39.0% CI(30.3~48.6) C2C+0.202% O2C+0.122%\n  CTA FORCED SELLING  n= 23 승률  30.4% CI(15.6~50.9) C2C+0.336%\n  CTA LONG            n=296 승률  54.4% CI(48.7~60.0) C2C+0.035%\n  CTA SELLING         n= 20 승률  35.0% CI(18.1~56.7) C2C+0.211%\n  RISK OFF            n=193 승률  50.3% CI(43.3~57.2) C2C-0.071%\n  RISK ON             n= 22 승률  59.1% CI(38.7~76.7) C2C+0.267%\n  STRESS              n= 59 승률  32.2% CI(21.7~44.9) C2C+0.340%\n  페이퍼($2,000·O2C) 최종 $2,180.29 (+180.29) WIN 121일 +670.39 LOSS 98일 -490.10 MaxDD -60.22\n\n[QQQ] 표본 492일\n  Bullish Edge n= 67 승률  68.7% CI(56.8~78.5) C2C+0.329% O2C+0.119%\n  Mild Bullish n=156 승률  55.8% CI(47.9~63.3) C2C+0.055% O2C+0.012%\n  Neutral      n= 52 (채점 제외)\n  Mild Bearish n=114 승률  43.9% CI(35.1~53.0) C2C+0.061% O2C-0.041%\n  Bearish Edge n=103 승률  42.7% CI(33.6~52.4) C2C+0.219% O2C+0.131%\n  CTA FORCED SELLING  n= 16 승률  43.8% CI(23.1~66.8) C2C+0.368%\n  CTA LONG            n=261 승률  55.9% CI(49.9~61.8) C2C+0.051%\n  CTA SELLING         n= 26 승률  34.6% CI(19.4~53.8) C2C+0.357%\n  RISK OFF            n=191 승률  50.3% CI(43.2~57.3) C2C-0.098%\n  RISK ON             n= 21 승률  61.9% CI(40.9~79.2) C2C+0.298%\n  STRESS              n= 62 승률  38.7% CI(27.6~51.2) C2C+0.398%\n  페이퍼($2,000·O2C) 최종 $2,178.11 (+178.11) WIN 127일 +933.13 LOSS 96일 -755.02 MaxDD -145.35",
+>>>>>>> Stashed changes
   "data": {
    "period": [
     "2024-07-22",
@@ -804,17 +809,17 @@
        "o2c": 0.01
       },
       "Neutral": {
-       "n": 57
+       "n": 56
       },
       "Mild Bearish": {
-       "n": 110,
-       "win": 50.9,
+       "n": 111,
+       "win": 50.5,
        "ci": [
-        41.7,
-        60.1
+        41.3,
+        59.6
        ],
-       "c2c": -0.08,
-       "o2c": -0.086
+       "c2c": -0.072,
+       "o2c": -0.081
       },
       "Bearish Edge": {
        "n": 105,
@@ -887,14 +892,14 @@
      },
      "regime": {},
      "paper": {
-      "final": 2018.0,
-      "pnl": 18.0,
-      "wins": 227,
-      "losses": 207,
-      "flat": 57,
-      "win_sum": 1891.67,
-      "loss_sum": -1873.66,
-      "max_dd": -314.37
+      "final": 2180.29,
+      "pnl": 180.29,
+      "wins": 121,
+      "losses": 98,
+      "flat": 272,
+      "win_sum": 670.39,
+      "loss_sum": -490.1,
+      "max_dd": -60.22
      }
     },
     "QQQ": {
@@ -1004,14 +1009,14 @@
      },
      "regime": {},
      "paper": {
-      "final": 1954.7,
-      "pnl": -45.3,
-      "wins": 230,
-      "losses": 210,
-      "flat": 52,
-      "win_sum": 2444.39,
-      "loss_sum": -2489.7,
-      "max_dd": -424.38
+      "final": 2178.11,
+      "pnl": 178.11,
+      "wins": 127,
+      "losses": 96,
+      "flat": 269,
+      "win_sum": 933.13,
+      "loss_sum": -755.02,
+      "max_dd": -145.35
      }
     }
    }
