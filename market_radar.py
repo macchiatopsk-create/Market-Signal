@@ -859,7 +859,7 @@ def _paper_sim(hist, mk):
         if oc is None:
             continue
         ma = h.get(mk + "_ma200", True)
-        pos = sized(s, ma); pnl = pos * oc / 100.0
+        pos = sized(s, ma); pnl = pos * oc / 100.0 - pos * 0.0003   # 비용 0.03% 반영
         eq += pnl; series.append(eq)
         if pos > 0:
             if pnl > 0: wins += 1; win_s += pnl
@@ -945,8 +945,41 @@ def _vsection(hist, mk, name):
     </div></details>
     """
 
-def validation_tab(hist):
+def compute_drift(hist, bt_data):
+    """라이브 BullEdge 승률이 백테스트 신뢰구간 하한 아래로 떨어지면 경고."""
+    out = {}
+    for tk, mk in (("SPY", "sp"), ("QQQ", "nq")):
+        try:
+            base = bt_data["tickers"][tk]["buckets"]["Bullish Edge"]
+            lo = base["ci"][0]
+        except Exception:
+            out[tk] = None; continue
+        obs = [h for h in hist if h.get(mk + "_ret1") is not None and (h.get(mk + "_next_score") or 99) <= 25]
+        n = len(obs); w = sum(1 for h in obs if h[mk + "_ret1"] > 0)
+        wr = round(w/n*100, 1) if n else None
+        out[tk] = dict(n=n, win=wr, base_lo=lo, base_win=base.get("win"),
+                       alert=bool(n >= 30 and wr is not None and wr < lo))
+    return out
+
+def drift_strip(drift):
+    if not drift: return ""
+    rows = ""
+    for tk, d in drift.items():
+        if d is None:
+            rows += f'<div class="drow"><span>{tk}</span><span class="dval">백테스트 기준선 없음</span></div>'; continue
+        if d["n"] < 30:
+            st, col = f"표본 축적 중 ({d['n']}/30)", "#6d7a8c"
+        elif d["alert"]:
+            st, col = f"⚠ 모델 이탈 — 라이브 {d['win']}% < 하한 {d['base_lo']}%", "#e95656"
+        else:
+            st, col = f"정상 — 라이브 {d['win']}% ≥ 하한 {d['base_lo']}%", "#34c77b"
+        rows += (f'<div class="drow"><span>{tk} · BullEdge 라이브 n={d["n"]}</span>'
+                 f'<span class="dval" style="color:{col}">{st}</span></div>')
+    return f'<div class="risk-card"><div class="rc-head" style="color:#dba642">MODEL DRIFT — 라이브 vs 백테스트</div>{rows}</div>'
+
+def validation_tab(hist, drift=None):
     return f"""
+    {drift_strip(drift)}
     {_vsection(hist, "sp", "S&P 500 · SPY")}
     {_vsection(hist, "nq", "나스닥 · QQQ")}
     <div class="note">가상 계좌 시뮬레이션 · 매일 $2,000 고정(복리 아님) · 백테스트에 따라 숏 베팅 봉인(채점은 계속 — 라이브에서 입증되면 해제 검토).
@@ -1451,12 +1484,13 @@ def run_backtest():
                 R["regime"][nm] = dict(n=len(sub), win=round(wr,1), ci=list(ci))
 
             # ─ 변형 실험실 (A~G) — 같은 표본에 전략 변형 나란히 ─
+            COST = 0.0003                                     # 왕복 0.03% (스프레드+슬리피지 근사)
             def _mk(rule, fld):
                 eq2 = ACCT; pk = ACCT; dd = 0.0; ws = ls = 0.0; w = l = 0
                 for r in rows:
                     ret = r.get(fld)
                     if ret is None: continue
-                    pos = rule(r); pnl = pos * ret / 100.0
+                    pos = rule(r); pnl = pos * ret / 100.0 - pos * COST
                     eq2 += pnl; pk = max(pk, eq2); dd = min(dd, eq2 - pk)
                     if pos > 0:
                         if pnl > 0: w += 1; ws += pnl
@@ -1522,9 +1556,34 @@ def run_backtest():
                 d_pnl = (_h_pnl(_sc) - base_pnl) * f365
                 R["ablation"][anm] = round(d_pnl, 2)
                 rep.append(f"    -{anm:12s} {d_pnl:+8.2f}/yr")
+            # ─ 반반 검증 (walk-forward): 전반 vs 후반 각각 H 성적 ─
+            R["walkforward"] = {}
+            rep.append("  ─ 반반 검증 (H · 비용반영) ─")
+            mid = len(rows) // 2
+            for hname, half in (("전반", rows[:mid]), ("후반", rows[mid:])):
+                if not half: continue
+                cal = max((pd.Timestamp(half[-1]["d"]) - pd.Timestamp(half[0]["d"])).days, 1)
+                fh = 365.0 / cal
+                eqh = 0.0; w = l = 0; be_n = be_w = 0
+                for r in half:
+                    _p = _h_rule(r["s"], r["ma200"])
+                    if r.get("o") is None: continue
+                    pnl = _p * r["o"] / 100.0 - _p * 0.0003
+                    eqh += pnl
+                    if _p > 0:
+                        if pnl > 0: w += 1
+                        elif pnl < 0: l += 1
+                    if r["s"] <= 25:
+                        be_n += 1; be_w += 1 if r["c"] > 0 else 0
+                wrh = round(w/(w+l)*100, 1) if w+l else None
+                bew = round(be_w/be_n*100, 1) if be_n else None
+                R["walkforward"][hname] = dict(period=[half[0]["d"], half[-1]["d"]], yr_pnl=round(eqh*fh, 2),
+                                               winrate=wrh, be_n=be_n, be_win=bew)
+                rep.append(f"    {hname} {half[0]['d']}~{half[-1]['d']}  연손익 {eqh*fh:+8.2f}  승률 {wrh}%  BullEdge n={be_n} 승률 {bew}%")
             eq = ACCT; peak = ACCT; mdd = 0.0; wd = ld = 0.0; wn = ln_ = fl = 0
             for r in rows:
-                pnl = sized(r["s"], r.get("ma200", True)) * r["o"] / 100.0
+                _p = sized(r["s"], r.get("ma200", True))
+                pnl = _p * r["o"] / 100.0 - _p * 0.0003
                 eq += pnl; peak = max(peak, eq); mdd = min(mdd, eq - peak)
                 if sized(r["s"], r.get("ma200", True)) == 0: fl += 1
                 elif pnl > 0: wn += 1; wd += pnl
@@ -1865,10 +1924,11 @@ def main():
                   f, ensure_ascii=False, indent=1)
 
     now = dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET")
+    drift = compute_drift(hist, bt_data) if bt_data else {}
     rtab  = risk_tab(rvals, rst, lvl, red, amber)
     sptab = signal_tab("S&P 500 · SPY", spd, bias_bucket_stats(hist, "sp"))
     nqtab = signal_tab("나스닥 100 · QQQ", nqd, bias_bucket_stats(hist, "nq"))
-    vtab  = validation_tab(hist)
+    vtab  = validation_tab(hist, drift)
     tp_data = {
         "SPY": dict(nextScore=spd["bias"]["score"], nextLabel=spd["bias"]["label"], ma200=sp_risk.get("above_ma200", True),
                     prevHigh=sp_risk["high"], prevLow=sp_risk["low"], prevClose=sp_risk["close"], refDate=today),
@@ -1882,6 +1942,16 @@ def main():
     write_pwa_assets()
 
     sent = dispatch_eod_alerts(today, spd, nqd)
+    # 드리프트 경고 텔레그램 (하루 1회 중복방지)
+    try:
+        als = load_alerts()
+        for tk, dr in (drift or {}).items():
+            if dr and dr.get("alert") and mark_alert(als, today, f"{tk}_drift"):
+                if send_telegram(f"⚠ {tk} 모델 이탈 감지\n라이브 BullEdge 승률 {dr['win']}% (n={dr['n']}) < 백테스트 하한 {dr['base_lo']}%\n전략 점검 필요"):
+                    sent += 1
+        save_alerts(als)
+    except Exception:
+        pass
 
     print(f"  위험단계: {LEVELS_NM(lvl)} (적{red}/황{amber})")
     print(f"  기관 SPY {inst_sp['tier']}(s{inst_sp['stress']})·{inst_sp['cta']['tier']} | QQQ {inst_nq['tier']}(s{inst_nq['stress']})·{inst_nq['cta']['tier']}")
