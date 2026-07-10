@@ -1455,6 +1455,9 @@ def run_backtest():
                 ("E_C_2일보유",      lambda r: ACCT if r["s"]<=25 and r["ma200"] else 0, "o2"),
                 ("F_C+연속2일하락",  lambda r: ACCT if r["s"]<=25 and r["ma200"] and r["dn2"] else 0, "o"),
                 ("G_C+RSI2<15",      lambda r: ACCT if r["s"]<=25 and r["ma200"] and r["rsi2"] is not None and r["rsi2"]<15 else 0, "o"),
+                ("H_D+Mild$500",     lambda r: (ACCT if r["s"]<=25 and r["ma200"] else 0)
+                                              + (ACCT/2 if r["s"]>=76 and r["ma200"] else 0)
+                                              + (ACCT/4 if 26 <= r["s"] <= 45 and r["ma200"] else 0), "o"),
             ]
             R["variants"] = {}
             rep.append("  ─ 변형 실험실 ($2,000·롱온리) ─")
