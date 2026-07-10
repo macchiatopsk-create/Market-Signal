@@ -709,9 +709,22 @@ def verdict_color(v):
 def load_hist():
     try:
         with open(HIST_PATH, encoding="utf-8") as f:
-            j = json.load(f)
-        return j["days"] if isinstance(j, dict) else j   # 신형 {"days":[...],"backtest":{...}} / 구형 리스트 둘 다 지원
-    except: return []
+            raw = f.read()
+        try:
+            j = json.loads(raw)
+        except Exception:
+            # git 충돌 마커 자가치유: 첫 버전 버리고 두 번째(더 새로운) 채택
+            out = []; mode = 0
+            for ln in raw.split("\n"):
+                if ln.startswith("<<<<<<<"): mode = 1; continue
+                if ln.startswith("=======") and mode == 1: mode = 2; continue
+                if ln.startswith(">>>>>>>"): mode = 0; continue
+                if mode != 1: out.append(ln)
+            j = json.loads("\n".join(out))
+            print("  history 충돌 마커 자가치유 완료")
+        return j["days"] if isinstance(j, dict) else j   # 신형/구형 둘 다 지원
+    except Exception:
+        return []
 
 def _regrade(hist):
     """전체 hist 를 훑어 아직 비어있는 채점값을 채운다 (ret2/ret5 누락 방지)."""
