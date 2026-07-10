@@ -489,10 +489,9 @@ def compute_debate(trend_sig, risk, inst):
         winner = "BULL" if bull > bear else "BEAR"
         dom = max(bull, bear) / total
         conv = "DECISIVE" if dom >= 0.75 else "CLEAR" if dom >= 0.60 else "CONTESTED"
-    dirword = "숏" if winner == "BEAR" else "롱" if winner == "BULL" else "—"
-    sizing = {"DECISIVE": f"{dirword} 표준 사이즈 (한쪽 압도)",
-              "CLEAR":    f"{dirword} 표준~축소",
-              "CONTESTED":"축소 1/3~1/2 (양측 대립 — 무리 금지)"}[conv]
+    sizing = {"DECISIVE": "한쪽 압도 — 확신도별 실제 성적은 검증 탭에서 축적 중",
+              "CLEAR":    "우세 뚜렷 — 확신도별 실제 성적은 검증 탭에서 축적 중",
+              "CONTESTED":"양측 대립 — 신호 신뢰도 낮은 날"}[conv]
     return dict(bull=bull, bear=bear, winner=winner, dominance=round(dom, 2),
                 conviction=conv, bull_reasons=bull_r, bear_reasons=bear_r, sizing=sizing)
 
@@ -504,11 +503,11 @@ CONV_COLOR = {"DECISIVE":"#2bd47e","CLEAR":"#46b1c9","CONTESTED":"#f0813f","QUIE
 #   0~25 BULLISH EDGE · 26~45 MILD BULLISH · 46~55 NEUTRAL · 56~75 MILD BEARISH · 76~100 BEARISH EDGE
 # ===========================================================================
 def next_day_bias_label(score):
-    if score <= 25:   return "BULLISH EDGE", "Long Favorable / Dip Buy (백테스트 67~69% 적중)"
-    elif score <= 45: return "MILD BULLISH", "Long 소액 ($500 급 — 기여 작음, 곡선 완충용)"
+    if score <= 25:   return "BULLISH EDGE", "Long Favorable / Dip Buy Candidate"
+    elif score <= 45: return "MILD BULLISH", "Long 소액 / 축소 사이즈"
     elif score <= 55: return "NEUTRAL", "애매함 / 무리 금지"
-    elif score <= 75: return "MILD BEARISH", "관망 (숏 봉인 — 검증상 엣지 없음)"
-    else:             return "BEARISH EDGE", "역발상 소액 롱 구간(200MA 위·검증 61%) · 추격숏 금지"
+    elif score <= 75: return "MILD BEARISH", "관망 우선 (숏 봉인)"
+    else:             return "BEARISH EDGE", "역발상 소액 롱 후보 (200MA 위 한정) · 추격 금지"
 
 def compute_next_day_bias(risk):
     c = risk.get("cond", {})
@@ -929,7 +928,7 @@ def _vsection(hist, mk, name):
       <div class="hero-label">{name} · PAPER $2,000 · LONG ONLY</div>
       <div class="veq">${P['eq']:,.2f}{chip}</div>
       {_eq_svg(P['series'])}
-      <div class="edge-wr">$2,000 기준선 · 신호 강도 사이징 · 다음날 시가→종가 · 비용 제외 · 숏 신호는 채점만(베팅 봉인)</div>
+      <div class="edge-wr">$2,000 기준선 · 신호 강도 사이징 · 다음날 시가→종가 · 왕복비용 0.03% 반영 · 숏 신호는 채점만(베팅 봉인)</div>
     </div>
     <div class="vstats">
       <div class="vcell"><div class="k">WIN {P['wins']}일</div><div class="v" style="color:#34c77b">+${P['win_s']:,.2f}</div></div>
@@ -954,7 +953,8 @@ def compute_drift(hist, bt_data):
             lo = base["ci"][0]
         except Exception:
             out[tk] = None; continue
-        obs = [h for h in hist if h.get(mk + "_ret1") is not None and (h.get(mk + "_next_score") or 99) <= 25]
+        obs = [h for h in hist if h.get(mk + "_ret1") is not None
+               and h.get(mk + "_next_score") is not None and h.get(mk + "_next_score") <= 25]
         n = len(obs); w = sum(1 for h in obs if h[mk + "_ret1"] > 0)
         wr = round(w/n*100, 1) if n else None
         out[tk] = dict(n=n, win=wr, base_lo=lo, base_win=base.get("win"),
@@ -1226,6 +1226,7 @@ function buildSession(res){
     orHigh: orBars.length ? Math.max(...orBars.map(b=>b.h)) : null,
     orLow:  orBars.length ? Math.min(...orBars.map(b=>b.l)) : null,
     orReady: nowMin >= 600, avgRange, nowMin,
+    sessionDate: dates[dates.length-1],
     prevHigh, prevLow, prevClose
   };
 }
@@ -1248,7 +1249,12 @@ function computePlan(ticker, s){
                direction:"NO TRADE", status:"WAIT", entry:null, stop:null, tp1:null, tp2:null, tp3:null,
                invalid:"", invalidation:"", notes:[]};
   if (!usingIntraday) out.notes.push("전일값 = EOD 참조 (" + (b.refDate||"") + ")");
-  if (score>=76 && b.ma200) out.direction="CONTRARIAN LONG · $1,000";
+  const nowNY = nyParts(Math.floor(Date.now()/1000));
+  const closedSession = !!(s.sessionDate && s.sessionDate !== nowNY.date);
+  if (closedSession) out.notes.push("표시 데이터: " + s.sessionDate + " 세션 (최근 거래일)");
+  const hardGate = (b.finalSignal==="SELL ONLY" || b.finalSignal==="SHORT ONLY");
+  if (hardGate) out.direction="NO TRADE · HARD GATE";
+  else if (score>=76 && b.ma200) out.direction="COUNTERTREND LONG TEST";
   else if (score>=76) out.direction="NO TRADE · MA아래 봉인";
   else if (score>=56) out.direction="NO TRADE · 관망";
   else if (score>=46) out.direction="BOTH ALLOWED";
@@ -1280,13 +1286,20 @@ function computePlan(ticker, s){
     out.notes.push("Entry: OR High 돌파 또는 VWAP 눌림 반등");
     out.invalidation="VWAP 아래 5분봉 종가 이탈 또는 OR Low 이탈";
   }
+  if (hardGate) {
+    out.status="NO TRADE";
+    out.notes.push("FINAL "+b.finalSignal+" 하드게이트 — 역발상 롱 포함 전 매매 봉인");
+    if (closedSession) out.status="MARKET CLOSED";
+    return out;
+  }
   if (score>=76 && b.ma200) {
     longPlan();
-    out.notes.push("역발상 반등 구간 — 소액($1,000 상당)만. 백테스트 61% 반등, 단 고위험(하락 지속 시 손절 엄수)");
+    out.status = out.status.replace("LONG SETUP ACTIVE","COUNTERTREND LONG ACTIVE").replace("LONG SETUP","COUNTERTREND LONG");
+    out.notes.push("추세 신호와 반대 방향의 역발상 테스트 — 축소 사이즈, 하락 지속 시 손절 엄수");
   }
   else if (score>=56) {
     out.status="NO TRADE";
-    out.notes.push(score>=76 ? "200MA 아래 — 역발상 봉인 (떨어지는 칼)" : "숏 봉인 — 이 구간 엣지 없음(백테스트). 관망");
+    out.notes.push(score>=76 ? "200MA 아래 — 역발상 봉인 (떨어지는 칼)" : "숏 봉인 — 검증상 엣지 없음. 관망");
   }
   else if (score<=45) longPlan();
   else {
@@ -1294,6 +1307,7 @@ function computePlan(ticker, s){
     else if (price<vwap && orL!=null && price<orL) shortPlan();
     else { out.status="NO TRADE"; out.notes.push("VWAP/OR 돌파 대기"); }
   }
+  if (closedSession) out.status="MARKET CLOSED";
   return out;
 }
 function renderPlan(p){
@@ -1447,7 +1461,7 @@ def run_backtest():
             if s <= 45: return ACCT/4
             if s >= 76: return ACCT/2
             return 0.0
-        rep = [f"기간 {idx[START].date()} ~ {idx[N-2].date()} · in-sample 주의 · 비용 제외"]
+        rep = [f"기간 {idx[START].date()} ~ {idx[N-2].date()} · in-sample 주의 · 왕복비용 0.03% 반영"]
         out = {"period": [str(idx[START].date()), str(idx[N-2].date())], "tickers": {}}
         for tk in ("SPY", "QQQ"):
             rows = obs[tk]; R = {"n": len(rows), "buckets": {}, "cta": {}, "inst": {}, "regime": {}, "paper": {}}
@@ -1537,7 +1551,8 @@ def run_backtest():
                 eq3 = 0.0
                 for r in rows:
                     if r.get("o") is None: continue
-                    eq3 += _h_rule(score_fn(r), r["ma200"]) * r["o"] / 100.0
+                    pos = _h_rule(score_fn(r), r["ma200"])
+                    eq3 += pos * r["o"] / 100.0 - pos * 0.0003
                 return eq3
             base_pnl = _h_pnl(lambda r: r["s"])
             ABL = [("전일저가이탈", ["prev_low_break"]), ("Daily구조", ["d_bear"]), ("Weekly구조", ["w_bear"]),
@@ -1845,12 +1860,25 @@ def build_eod_alerts(ticker, d):
                   f"RV20 {cta.get('rv20')} · RV100med {cta.get('rv100_median')}")))
     return out
 
+def _try_send(alerts, today, key, text):
+    """이미 보냈으면 스킵. 전송 '성공 후에만' 기록 (실패 시 다음 실행에 재시도)."""
+    day = alerts.setdefault(today, [])
+    if key in day:
+        return False
+    if send_telegram(text):
+        day.append(key)
+        keep = set(sorted(alerts.keys())[-10:])
+        for k in list(alerts.keys()):
+            if k not in keep: alerts.pop(k, None)
+        return True
+    print(f"  Telegram 미전송(재시도 예정): {key}")
+    return False
+
 def dispatch_eod_alerts(today, spd, nqd):
     alerts = load_alerts(); sent = 0
     for ticker, d in (("SPY", spd), ("QQQ", nqd)):
         for a in build_eod_alerts(ticker, d):
-            if mark_alert(alerts, today, a["key"]):
-                if send_telegram(a["text"]): sent += 1
+            if _try_send(alerts, today, a["key"], a["text"]): sent += 1
     save_alerts(alerts)
     return sent
 
@@ -1931,8 +1959,10 @@ def main():
     vtab  = validation_tab(hist, drift)
     tp_data = {
         "SPY": dict(nextScore=spd["bias"]["score"], nextLabel=spd["bias"]["label"], ma200=sp_risk.get("above_ma200", True),
+                    finalSignal=spd["fsig"],
                     prevHigh=sp_risk["high"], prevLow=sp_risk["low"], prevClose=sp_risk["close"], refDate=today),
         "QQQ": dict(nextScore=nqd["bias"]["score"], nextLabel=nqd["bias"]["label"], ma200=nq_risk.get("above_ma200", True),
+                    finalSignal=nqd["fsig"],
                     prevHigh=nq_risk["high"], prevLow=nq_risk["low"], prevClose=nq_risk["close"], refDate=today),
     }
     tp_js = tradeplan_script(tp_data)
@@ -1946,8 +1976,9 @@ def main():
     try:
         als = load_alerts()
         for tk, dr in (drift or {}).items():
-            if dr and dr.get("alert") and mark_alert(als, today, f"{tk}_drift"):
-                if send_telegram(f"⚠ {tk} 모델 이탈 감지\n라이브 BullEdge 승률 {dr['win']}% (n={dr['n']}) < 백테스트 하한 {dr['base_lo']}%\n전략 점검 필요"):
+            if dr and dr.get("alert"):
+                if _try_send(als, today, f"{tk}_drift",
+                             f"⚠ {tk} 모델 이탈 감지\n라이브 BullEdge 승률 {dr['win']}% (n={dr['n']}) < 백테스트 하한 {dr['base_lo']}%\n전략 점검 필요"):
                     sent += 1
         save_alerts(als)
     except Exception:
