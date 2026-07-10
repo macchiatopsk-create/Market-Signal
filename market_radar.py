@@ -503,11 +503,11 @@ CONV_COLOR = {"DECISIVE":"#2bd47e","CLEAR":"#46b1c9","CONTESTED":"#f0813f","QUIE
 #   0~25 BULLISH EDGE · 26~45 MILD BULLISH · 46~55 NEUTRAL · 56~75 MILD BEARISH · 76~100 BEARISH EDGE
 # ===========================================================================
 def next_day_bias_label(score):
-    if score <= 25:   return "BULLISH EDGE", "Long Favorable / Dip Buy Candidate"
+    if score <= 25:   return "BULLISH EDGE", "Long Favorable / Dip Buy (백테스트 67~69% 적중)"
     elif score <= 45: return "MILD BULLISH", "Long 가능하지만 사이즈 작게"
     elif score <= 55: return "NEUTRAL", "애매함 / 무리 금지"
-    elif score <= 75: return "MILD BEARISH", "Long Caution / 관망 우선"
-    else:             return "BEARISH EDGE", "No Long / Sell Rally"
+    elif score <= 75: return "MILD BEARISH", "롱 자제 / 관망 (숏 봉인 — 검증상 엣지 없음)"
+    else:             return "BEARISH EDGE", "롱 금지 · 추격숏 금지 (검증상 다음날 반등 우세 ~61%)"
 
 def compute_next_day_bias(risk):
     c = risk.get("cond", {})
@@ -829,46 +829,108 @@ def _inst_dir(o):
     t = o["inst"]
     return "bear" if t in ("RISK OFF", "STRESS") else "bull" if t == "RISK ON" else None
 
+def _paper_sim(hist, mk):
+    """라이브 페이퍼 계좌 ($2,000 · 롱온리 사이징 · 다음날 O2C)."""
+    ACCT = 2000.0
+    def sized(s):
+        if s is None: return 0.0
+        if s <= 25: return ACCT
+        if s <= 45: return ACCT/2
+        return 0.0
+    eq = ACCT; series = [ACCT]; win_s = loss_s = 0.0; wins = losses = 0; recent = []
+    for h in hist:
+        s = h.get(mk + "_next_score"); oc = h.get(mk + "_oc1")
+        if oc is None:
+            continue
+        pos = sized(s); pnl = pos * oc / 100.0
+        eq += pnl; series.append(eq)
+        if pos > 0:
+            if pnl > 0: wins += 1; win_s += pnl
+            elif pnl < 0: losses += 1; loss_s += pnl
+        tag = ("산다 $2,000" if s is not None and s <= 25 else "산다 $1,000" if s is not None and s <= 45
+               else "판다·봉인" if s is not None and s >= 56 else "관망")
+        cls = "L" if (s is not None and s <= 45) else ("S" if (s is not None and s >= 56) else "W")
+        hit = None
+        if s is not None and s <= 45: hit = oc > 0
+        elif s is not None and s >= 56: hit = oc < 0          # 봉인이지만 채점은 계속
+        recent.append(dict(d=str(h.get("date",""))[5:], tag=tag, cls=cls, oc=oc,
+                           pnl=pnl if pos > 0 else None, hit=hit))
+    n_dir = wins + losses
+    hitrate = round(wins / n_dir * 100, 1) if n_dir else None
+    return dict(eq=eq, pnl=eq-ACCT, series=series, win_s=win_s, loss_s=loss_s,
+                wins=wins, losses=losses, hitrate=hitrate, recent=recent[-8:][::-1])
+
+def _eq_svg(series):
+    if len(series) < 2:
+        return '<div class="edge-wr">에쿼티 커브 — 기록 누적 중</div>'
+    mn, mx = min(series), max(series)
+    pad = max((mx - mn) * 0.15, 1.0); mn -= pad; mx += pad
+    W, H = 600, 86
+    pts = " ".join(f"{i*W/(len(series)-1):.1f},{H-(v-mn)/(mx-mn)*H:.1f}" for i, v in enumerate(series))
+    base_y = H - (2000 - mn) / (mx - mn) * H
+    return (f'<svg class="eqcurve" viewBox="0 0 {W} {H}" preserveAspectRatio="none">'
+            f'<line x1="0" y1="{base_y:.1f}" x2="{W}" y2="{base_y:.1f}" stroke="#2a3648" stroke-width="1" stroke-dasharray="4 5"/>'
+            f'<polyline points="{pts}" fill="none" stroke="#7a5c28" stroke-width="5" opacity=".45"/>'
+            f'<polyline points="{pts}" fill="none" stroke="#dba642" stroke-width="2"/></svg>')
+
 def _vsection(hist, mk, name):
+    P = _paper_sim(hist, mk)
+    chip = f'<span class="vchip {"up" if P["pnl"] >= 0 else "dn"}">{P["pnl"]:+,.2f} · {P["pnl"]/20:+.2f}%</span>'
+    recs = ""
+    for r in P["recent"]:
+        mv = f'O2C {r["oc"]:+.2f}%' if r["oc"] is not None else "—"
+        pl = ("—" if r["pnl"] is None else f'{r["pnl"]:+,.2f}')
+        plc = "#6d7a8c" if r["pnl"] is None else ("#34c77b" if r["pnl"] > 0 else "#e95656")
+        mark = "—" if r["hit"] is None else ("●" if r["hit"] else "○")
+        mc = "#424c5c" if r["hit"] is None else ("#34c77b" if r["hit"] else "#e95656")
+        recs += (f'<div class="rec"><span class="d">{r["d"]}</span><span class="sig {r["cls"]}">{r["tag"]}</span>'
+                 f'<span class="mv">{mv}</span><span class="pl" style="color:{plc}">{pl}</span>'
+                 f'<span class="hit" style="color:{mc}">{mark}</span></div>')
+    if not recs:
+        recs = '<div class="rec"><span class="mv">기록 누적 중 — 다음 거래일부터 채점</span></div>'
     obs = _observations(hist, mk)
     def fmt(sub):
         n, wr, ac, ao, rr = sub
-        wrs = f"{wr}%" if wr is not None else "—"
-        acs = f"{ac:+.2f}%" if ac is not None else "—"
-        aos = f"{ao:+.2f}%" if ao is not None else "—"
-        rrs = f"{rr:+.2f}" if rr is not None else "—"
-        return f'<span class="dval">n{n}·승{wrs}·C2C{acs}·O2C{aos}·R{rrs}</span>'
+        return (f'<span class="dval">{n}건 · 승 {f"{wr}%" if wr is not None else "—"}'
+                f' · C2C {f"{ac:+.2f}%" if ac is not None else "—"} · O2C {f"{ao:+.2f}%" if ao is not None else "—"}</span>')
     def line(label, sub):
         return f'<div class="drow"><span>{label}</span>{fmt(sub)}</div>'
-    n, wr, ac, ao, rr = _vstats(obs, _bias_dir)
     score_rows = "".join(line(f"{nm} ({lo}~{hi})",
                           _vstats([o for o in obs if o["score"] is not None and lo <= o["score"] <= hi], _bias_dir))
                           for lo, hi, nm in BIAS_BUCKETS if nm != "Neutral")
+    conv_rows = "".join(line(t, _vstats([o for o in obs if o.get("conv") == t], _bias_dir))
+                        for t in ("DECISIVE", "CLEAR", "CONTESTED"))
     cta_rows = "".join(line(t, _vstats([o for o in obs if o["cta"] == t], _cta_dir))
                        for t in ("CTA LONG", "CTA SELLING", "CTA FORCED SELLING"))
     inst_rows = "".join(line(t, _vstats([o for o in obs if o["inst"] == t], _inst_dir))
                         for t in ("RISK ON", "RISK OFF", "STRESS"))
-    conv_rows = "".join(line(t, _vstats([o for o in obs if o.get("conv") == t], _bias_dir))
-                        for t in ("DECISIVE", "CLEAR", "CONTESTED"))
     return f"""
-    <div class="edge-hero" style="--c:#46b1c9">
-      <div class="hero-label">{name} · VALIDATION (Bias 방향)</div>
-      <div class="bias-score" style="color:#46b1c9">{(str(wr)+"%") if wr is not None else "—"}<span class="bias-max"> 승률</span></div>
-      <div class="edge-meta">표본 {n} · C2C {("%+.2f%%"%ac) if ac is not None else "—"} · O2C {("%+.2f%%"%ao) if ao is not None else "—"} · R {("%+.2f"%rr) if rr is not None else "—"} · <b>{SAMPLE_STATUS(n)}</b></div>
+    <div class="vhero">
+      <div class="hero-label">{name} · PAPER $2,000 · LONG ONLY</div>
+      <div class="veq">${P['eq']:,.2f}{chip}</div>
+      {_eq_svg(P['series'])}
+      <div class="edge-wr">$2,000 기준선 · 신호 강도 사이징 · 다음날 시가→종가 · 비용 제외 · 숏 신호는 채점만(베팅 봉인)</div>
     </div>
-    <div class="risk-card"><div class="rc-head" style="color:#46b1c9">{name} · 점수 구간별 (실제 이동%)</div>{score_rows}</div>
-    <div class="risk-card"><div class="rc-head" style="color:#46b1c9">{name} · 확신도별 (DESK 우세도)</div>{conv_rows}</div>
-    <div class="risk-card"><div class="rc-head" style="color:#46b1c9">{name} · CTA</div>{cta_rows}</div>
-    <div class="risk-card"><div class="rc-head" style="color:#46b1c9">{name} · Institutional</div>{inst_rows}</div>
+    <div class="vstats">
+      <div class="vcell"><div class="k">WIN {P['wins']}일</div><div class="v" style="color:#34c77b">+${P['win_s']:,.2f}</div></div>
+      <div class="vcell"><div class="k">LOSS {P['losses']}일</div><div class="v" style="color:#e95656">${P['loss_s']:,.2f}</div></div>
+      <div class="vcell"><div class="k">HIT RATE</div><div class="v">{f"{P['hitrate']}%" if P['hitrate'] is not None else "—"}</div></div>
+    </div>
+    <div class="risk-card"><div class="rc-head" style="color:#dba642">{name} · TRADE LOG</div>{recs}</div>
+    <details class="trend-fold"><summary>{name} · 고급 통계 (구간·확신도·CTA·기관)</summary><div class="detail">
+      <div class="bk-h" style="margin-top:10px">점수 구간별</div>{score_rows}
+      <div class="bk-h" style="margin-top:12px">확신도별 (DESK)</div>{conv_rows}
+      <div class="bk-h" style="margin-top:12px">CTA</div>{cta_rows}
+      <div class="bk-h" style="margin-top:12px">기관</div>{inst_rows}
+    </div></details>
     """
 
 def validation_tab(hist):
     return f"""
     {_vsection(hist, "sp", "S&P 500 · SPY")}
     {_vsection(hist, "nq", "나스닥 · QQQ")}
-    <div class="note">SPY / QQQ 각각 따로 채점합니다. 방향: Bias≥56 · CTA SELLING/FORCED · Inst RISK OFF/STRESS = 하락 예측.
-    C2C=종가→종가 · O2C=다음날 시가→종가(부호 그대로 — 하락예측이면 −%가 적중). trade_r/TP/SL 채점은 Trade Plan Box 데이터 쌓이면 활성화.
-    지수별로 나누면 표본이 절반씩이라 수렴은 느리지만 더 정확합니다(30건↑부터 의미).</div>
+    <div class="note">가상 계좌 시뮬레이션 · 매일 $2,000 고정(복리 아님) · 백테스트에 따라 숏 베팅 봉인(채점은 계속 — 라이브에서 입증되면 해제 검토).
+    ● 적중 ○ 빗나감 — 관망/미채점 · 표본 30건↑부터 의미 · 투자조언 아님.</div>
     """
 
 # ===========================================================================
@@ -898,10 +960,16 @@ def debate_card(deb):
     bear_li = "".join(f"<li>{r}</li>" for r in deb["bear_reasons"]) or "<li>—</li>"
     bull_li = "".join(f"<li>{r}</li>" for r in deb["bull_reasons"]) or "<li>—</li>"
     verdict = {"BULL": "BULL WINS", "BEAR": "BEAR WINS", "SPLIT": "SPLIT (대립)", "QUIET": "QUIET"}[winner]
+    tot = max(deb["bull"] + deb["bear"], 1)
+    bear_pct = round(deb["bear"] / tot * 100)
+    tug = (f'<div class="tug-lbl"><span style="color:#e95656">BEAR {deb["bear"]}</span>'
+           f'<span style="color:#34c77b">BULL {deb["bull"]}</span></div>'
+           f'<div class="tug"><div class="tug-bear" style="width:{bear_pct}%"></div><div class="tug-bull"></div><div class="tug-mid"></div></div>')
     return f"""<div class="risk-card">
       <div class="rc-head" style="color:{col}">BULL vs BEAR DESK — {verdict}</div>
-      <div class="desk"><div class="desk-h" style="color:#f04747">🐻 BEAR · 강도 {deb['bear']}</div><ul class="edge-list">{bear_li}</ul></div>
-      <div class="desk"><div class="desk-h" style="color:#2bd47e">🐂 BULL · 강도 {deb['bull']}</div><ul class="edge-list">{bull_li}</ul></div>
+      {tug}
+      <div class="desk"><div class="desk-h" style="color:#e95656">BEAR</div><ul class="edge-list">{bear_li}</ul></div>
+      <div class="desk"><div class="desk-h" style="color:#34c77b">BULL</div><ul class="edge-list">{bull_li}</ul></div>
       <div class="debate-verdict">확신도 <b style="color:{ccol}">{conv}</b> · 우세도 {int(deb['dominance']*100)}%</div>
       <div class="edge-act" style="font-size:14px;">권장: {deb['sizing']}</div>
       <div class="tp-foot">사이징은 참고용 가이드일 뿐 투자조언이 아닙니다. 본인 판단·리스크 관리 필수.</div>
@@ -1004,13 +1072,35 @@ def risk_tab(rvals, rst, lvl, red, amber):
     pb = {"calm":"관찰만. 트리거 미발동.","watch":"추적 강화. 매일 확인.",
           "alert":"대응 준비. 정한 매수레벨·분할 점검. 반등 이유 있는 것만.",
           "crisis":"대응 모드. 정한 트리거대로 분할. 패닉·본전심리 차단."}[lvl]
+    # 레이더 스코프 — 심각도가 중심 거리(적=가깝게), 스윕 회전
+    import math as _m
+    DIST = {"red": 0.30, "amber": 0.58, "green": 0.86, "none": 0.86}
+    BCOL = {"red": "#e95656", "amber": "#d8a322", "green": "#34c77b", "none": "#424c5c"}
+    n_it = len(RISK); blips = ""
+    for i, ind in enumerate(RISK):
+        s = rst[ind["key"]]
+        ang = _m.radians(-90 + i * (360 / n_it) + 18)
+        bx = 150 + 128 * DIST[s] * _m.cos(ang); by = 150 + 128 * DIST[s] * _m.sin(ang)
+        blips += (f'<circle cx="{bx:.0f}" cy="{by:.0f}" r="4.5" fill="{BCOL[s]}"/>' 
+                  f'<text class="blip-t" x="{bx+8:.0f}" y="{by+4:.0f}" fill="{BCOL[s]}">{ind["name"].split("(")[0].strip()[:6]}</text>')
+    scope = f"""<svg class="scope" width="300" height="300" viewBox="0 0 300 300">
+      <circle class="ring" cx="150" cy="150" r="128"/><circle class="ring" cx="150" cy="150" r="85"/><circle class="ring" cx="150" cy="150" r="42"/>
+      <line class="spoke" x1="22" y1="150" x2="278" y2="150"/><line class="spoke" x1="150" y1="22" x2="150" y2="278"/>
+      <g class="swp"><line x1="150" y1="150" x2="150" y2="24" stroke="#dba642" stroke-width="2"/>
+        <line x1="150" y1="150" x2="115" y2="30" stroke="#dba642" stroke-width="2" opacity=".35"/>
+        <line x1="150" y1="150" x2="84" y2="45" stroke="#dba642" stroke-width="2" opacity=".14"/></g>
+      <circle cx="150" cy="150" r="3" fill="#dba642"/>
+      {blips}
+      <text class="blip-t" x="150" y="165" fill="#424c5c" text-anchor="middle">중심 = 위험 임박</text>
+    </svg>"""
     return f"""
     <div class="sig-hero" style="--c:{col}">
-      <div class="hero-label">위험 감지 · 종합 단계</div>
+      <div class="hero-label">RISK RADAR · 종합 단계</div>
       <div class="sig-label" style="color:{col}">{nm}</div>
       <div class="sig-meta">점등 {red} 적색 · {amber} 황색 / 5</div>
       <div class="sigbar">{segs}</div>
     </div>
+    {scope}
     <div class="playbook" style="border-color:{col}"><span class="pk">행동 지침</span>{pb}</div>
     <div class="rcards">{cards}</div>
     """
@@ -1105,8 +1195,8 @@ function computePlan(ticker, s){
                direction:"NO TRADE", status:"WAIT", entry:null, stop:null, tp1:null, tp2:null, tp3:null,
                invalid:"", invalidation:"", notes:[]};
   if (!usingIntraday) out.notes.push("전일값 = EOD 참조 (" + (b.refDate||"") + ")");
-  if (score>=76) out.direction="SHORT ONLY";
-  else if (score>=56) out.direction="SHORT PREFERRED";
+  if (score>=76) out.direction="NO TRADE · 숏 봉인";
+  else if (score>=56) out.direction="NO TRADE · 관망";
   else if (score>=46) out.direction="BOTH ALLOWED";
   else if (score>=26) out.direction="LONG PREFERRED";
   else out.direction="LONG ONLY";
@@ -1136,7 +1226,10 @@ function computePlan(ticker, s){
     out.notes.push("Entry: OR High 돌파 또는 VWAP 눌림 반등");
     out.invalidation="VWAP 아래 5분봉 종가 이탈 또는 OR Low 이탈";
   }
-  if (score>=56) shortPlan();
+  if (score>=56) {
+    out.status="NO TRADE";
+    out.notes.push("숏 봉인 — 백테스트상 이 구간 다음날 반등 우세(~61%). 추격숏·신규롱 모두 금지, 관망");
+  }
   else if (score<=45) longPlan();
   else {
     if (price>vwap && orH!=null && price>orH) longPlan();
@@ -1266,12 +1359,10 @@ def run_backtest():
                                     cta=inst["cta"]["tier"], it=inst["tier"], v=v_t))
 
         ACCT = 2000.0
-        def sized(s):
+        def sized(s):                    # 롱온리 (백테스트 결과: 숏 구간 엣지 없음 → 봉인)
             if s <= 25: return ACCT
             if s <= 45: return ACCT/2
-            if s <= 55: return 0.0
-            if s <= 75: return -ACCT/2
-            return -ACCT
+            return 0.0
         rep = [f"기간 {idx[START].date()} ~ {idx[N-2].date()} · in-sample 주의 · 비용 제외"]
         out = {"period": [str(idx[START].date()), str(idx[N-2].date())], "tickers": {}}
         for tk in ("SPY", "QQQ"):
@@ -1343,115 +1434,153 @@ def render(rtab, sptab, nqtab, vtab, now, errors, tp_js=""):
 <meta name="apple-mobile-web-app-title" content="시장 레이더">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-:root{{--bg:#0a0e14;--surface:#111722;--s2:#161d2a;--border:#1f2a38;--text:#c9d4e0;--muted:#6b7889;--dim:#46505f;--teal:#2bd4c0;}}
+:root{{--bg:#06090d;--surface:#0b1017;--s2:#080d13;--border:#1a2230;--b2:#2a3648;--text:#e6edf5;--muted:#6d7a8c;--dim:#424c5c;--teal:#dba642;--gold:#dba642;--green:#34c77b;--red:#e95656;--amber:#f08c3c;}}
 *{{margin:0;padding:0;box-sizing:border-box;}}
-body{{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;padding:0 0 60px;background-image:radial-gradient(circle at 50% -10%,rgba(43,212,192,.06),transparent 55%);min-height:100vh;}}
+body{{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;padding:0 0 60px;min-height:100vh;}}
 .wrap{{max-width:760px;margin:0 auto;padding:0 16px;}}
-header{{padding:24px 0 14px;}}
-.eyebrow{{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--teal);margin-bottom:6px;}}
-h1{{font-family:'Oswald',sans-serif;font-weight:500;font-size:clamp(26px,7vw,38px);text-transform:uppercase;}}
-.stamp{{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);margin-top:6px;}}
-.errbar{{background:rgba(240,71,71,.1);color:#f04747;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:8px 12px;border-radius:8px;margin-bottom:12px;}}
-.tabs{{display:flex;gap:6px;margin:14px 0 20px;}}
-.tab{{flex:1;font-family:'Oswald',sans-serif;font-size:15px;text-transform:uppercase;letter-spacing:.05em;text-align:center;padding:12px 6px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;color:var(--muted);transition:all .2s;}}
-.tab.active{{color:var(--text);border-color:var(--teal);background:var(--s2);}}
-.panel{{display:none;}} .panel.active{{display:block;}}
-.sig-hero,.verdict-hero{{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:12px;position:relative;overflow:hidden;}}
-.sig-hero::before,.verdict-hero::before{{content:"";position:absolute;inset:0;background:var(--c);opacity:.06;}}
-.hero-label{{position:relative;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}}
-.sig-label{{position:relative;font-family:'Oswald',sans-serif;font-weight:600;font-size:clamp(32px,9vw,52px);line-height:1;text-transform:uppercase;}}
-.vreason{{position:relative;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--text);margin-top:6px;}}
+header{{padding:22px 0 12px;display:flex;align-items:center;gap:14px;}}
+.glyph{{width:38px;height:38px;flex:none;}}
+.glyph .sw{{transform-origin:19px 19px;animation:spin 5s linear infinite;}}
+@keyframes spin{{to{{transform:rotate(360deg);}}}}
+.hgroup h1{{font-family:'Poppins',sans-serif;font-weight:700;font-size:clamp(20px,5.4vw,26px);letter-spacing:.01em;line-height:1.1;}}
+.eyebrow{{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);}}
+.stamp{{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);margin-left:auto;text-align:right;}}
+.errbar{{background:rgba(233,86,86,.08);color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:11px;padding:8px 12px;border:1px solid rgba(233,86,86,.3);margin-bottom:12px;}}
+.tabs{{display:flex;gap:24px;margin:8px 0 0;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:5;}}
+.tab{{font-family:'Poppins','Noto Sans KR',sans-serif;font-weight:600;font-size:14.5px;letter-spacing:.02em;padding:12px 2px;cursor:pointer;color:var(--dim);border-bottom:3px solid transparent;white-space:nowrap;}}
+.tab.active{{color:var(--text);border-bottom-color:var(--gold);}}
+.swipehint{{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);align-self:center;padding-right:2px;}}
+.panels{{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -16px;}}
+.panels::-webkit-scrollbar{{display:none;}}
+.panel{{flex:0 0 100%;scroll-snap-align:start;padding:18px 16px 0;min-width:0;}}
+.sig-hero,.verdict-hero{{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--c);border-radius:6px;padding:20px;margin-bottom:12px;position:relative;}}
+.hero-label{{position:relative;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}}
+.sig-label{{position:relative;font-family:'Poppins',sans-serif;font-weight:700;font-size:clamp(32px,9vw,50px);line-height:1;text-transform:uppercase;letter-spacing:.01em;}}
+.vreason{{position:relative;font-size:13px;color:var(--muted);margin-top:8px;}}
 .dual{{position:relative;display:flex;gap:10px;margin-top:14px;}}
-.dual-item{{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}}
-.di-k{{display:block;font-size:10.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.12em;margin-bottom:4px;}}
-.di-v{{font-family:'Oswald',sans-serif;font-size:18px;}}
-.sig-meta{{position:relative;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);margin-top:10px;}}
-.sigbar{{position:relative;display:flex;gap:6px;margin-top:16px;}}
-.sigseg{{flex:1;height:8px;border-radius:3px;background:var(--s2);border:1px solid var(--border);}}
-.sigseg.green{{background:#3fb950;border-color:#3fb950;}} .sigseg.amber{{background:#d8a322;border-color:#d8a322;}} .sigseg.red{{background:#f04747;border-color:#f04747;}}
-.edge-hero{{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--c);border-radius:14px;padding:18px 20px;margin-bottom:12px;position:relative;overflow:hidden;}}
-.edge-hero::before{{content:"";position:absolute;inset:0;background:var(--c);opacity:.05;}}
-.edge-hero.noedge{{border-left-color:#46505f;opacity:.8;}}
-.edge-dir{{position:relative;font-family:'Oswald',sans-serif;font-weight:600;font-size:30px;line-height:1;text-transform:uppercase;margin-top:4px;}}
-.edge-meta{{position:relative;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);margin-top:6px;}}
-.edge-act{{position:relative;font-family:'Oswald',sans-serif;font-size:16px;color:var(--text);margin-top:8px;}}
-.edge-list{{position:relative;list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}}
-.edge-list li{{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;}}
+.dual-item{{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:4px;padding:10px 12px;}}
+.di-k{{display:block;font-size:10px;color:var(--dim);font-family:'IBM Plex Mono',monospace;font-weight:600;text-transform:uppercase;letter-spacing:.14em;margin-bottom:4px;}}
+.di-v{{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:17px;}}
+.sig-meta{{position:relative;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);margin-top:12px;}}
+.sigbar{{position:relative;display:flex;gap:5px;margin-top:16px;}}
+.sigseg{{flex:1;height:7px;background:var(--s2);border:1px solid var(--border);}}
+.sigseg.green{{background:var(--green);border-color:var(--green);}} .sigseg.amber{{background:#d8a322;border-color:#d8a322;}} .sigseg.red{{background:var(--red);border-color:var(--red);}}
+.edge-hero{{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--c);border-radius:6px;padding:18px 20px;margin-bottom:12px;position:relative;}}
+.edge-hero.noedge{{border-left-color:var(--dim);opacity:.85;}}
+.edge-dir{{position:relative;font-family:'Poppins',sans-serif;font-weight:700;font-size:26px;line-height:1;text-transform:uppercase;margin-top:4px;}}
+.edge-meta{{position:relative;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);margin-top:6px;}}
+.edge-act{{position:relative;font-family:'Noto Sans KR',sans-serif;font-weight:500;font-size:14.5px;color:var(--text);margin-top:10px;}}
+.edge-list{{position:relative;list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}}
+.edge-list li{{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);border:1px solid var(--b2);padding:4px 9px;}}
 .edge-wr{{position:relative;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--dim);margin-top:10px;}}
-.bias-score{{position:relative;font-family:'Oswald',sans-serif;font-weight:600;font-size:46px;line-height:1;margin-top:2px;}}
-.bias-max{{font-size:16px;color:var(--muted);}}
-.bias-bar{{position:relative;height:9px;background:var(--s2);border:1px solid var(--border);border-radius:5px;margin:10px 0;overflow:hidden;}}
-.bias-fill{{position:absolute;left:0;top:0;bottom:0;border-radius:5px;opacity:.85;}}
-.bias-mid{{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--muted);}}
+.bias-score{{position:relative;font-family:'Poppins',sans-serif;font-weight:700;font-size:76px;line-height:.95;margin-top:2px;letter-spacing:-.01em;}}
+.bias-max{{font-size:17px;color:var(--dim);font-family:'IBM Plex Mono',monospace;font-weight:400;}}
+.bias-bar{{position:relative;height:13px;background:var(--s2);border:1px solid var(--border);margin:14px 0 10px;overflow:hidden;}}
+.bias-fill{{position:absolute;left:0;top:0;bottom:0;}}
+.bias-bar::after{{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(5% - 3px),var(--bg) calc(5% - 3px) 5%);}}
+.bias-mid{{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:var(--text);z-index:2;}}
 .bucket{{position:relative;margin-top:12px;border-top:1px solid var(--border);padding-top:6px;}}
-.bk-h{{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}}
-.tradeplan{{background:var(--surface);border:1px solid var(--border);border-left:4px solid #46505f;border-radius:14px;padding:16px 18px;margin-bottom:12px;}}
+.bk-h{{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:2px;}}
+.tradeplan{{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--dim);border-radius:6px;padding:16px 18px;margin-bottom:12px;}}
 .tp-bar{{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}}
-.tp-enable{{background:var(--s2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:'IBM Plex Mono',monospace;}}
-.tp-head{{font-family:'Oswald',sans-serif;font-weight:600;font-size:24px;text-transform:uppercase;line-height:1.1;}}
-.tp-sub{{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);margin:4px 0 10px;}}
-.tp-row{{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--muted);}}
+.tp-enable{{background:none;border:1px solid var(--b2);color:var(--muted);padding:5px 11px;font-size:11px;cursor:pointer;font-family:'IBM Plex Mono',monospace;}}
+.tp-head{{font-family:'Poppins',sans-serif;font-weight:700;font-size:26px;text-transform:uppercase;line-height:1.1;}}
+.tp-sub{{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);margin:5px 0 12px;}}
+.tp-row{{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--dim);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.06em;}}
 .tp-row:last-child{{border-bottom:none;}}
-.tp-v{{font-family:'IBM Plex Mono',monospace;color:var(--text);}}
-.tp-plan{{margin-top:8px;padding-top:6px;border-top:1px dashed var(--border);}}
-.tp-plan .tp-v{{color:var(--teal);font-weight:600;}}
-.tp-note{{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);margin-top:8px;line-height:1.5;}}
-.tp-foot{{font-size:10px;color:var(--dim);margin-top:10px;border-top:1px solid var(--border);padding-top:8px;}}
-.desk{{margin-top:8px;}}
-.desk-h{{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;margin-bottom:4px;}}
-.debate-verdict{{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--text);margin-top:10px;border-top:1px dashed var(--border);padding-top:8px;}}
-.risk-card{{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 16px;margin-bottom:12px;}}
-.rc-head{{font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.04em;padding:10px 0 6px;border-bottom:1px solid var(--border);text-transform:uppercase;}}
-.winrate{{display:flex;justify-content:space-between;align-items:center;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:13px 16px;margin-bottom:12px;}}
-.wr-label{{font-size:12px;color:var(--muted);}} .wr-val{{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--teal);}}
-.trend-fold{{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden;}}
-.trend-fold summary{{cursor:pointer;padding:13px 16px;font-family:'Oswald',sans-serif;font-size:14px;color:var(--muted);list-style:none;}}
+.tp-v{{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;color:var(--text);text-transform:none;letter-spacing:0;}}
+.tp-plan{{margin-top:10px;padding:10px 12px;background:var(--s2);border:1px solid var(--b2);}}
+.tp-plan .tp-row{{border-bottom-color:var(--b2);}}
+.tp-plan .tp-v{{color:var(--gold);}}
+.tp-note{{font-family:'Noto Sans KR',sans-serif;font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6;}}
+.tp-foot{{font-size:10px;color:var(--dim);margin-top:12px;border-top:1px solid var(--border);padding-top:8px;}}
+.desk{{margin-top:10px;}}
+.desk-h{{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;letter-spacing:.08em;margin-bottom:4px;}}
+.tug{{position:relative;height:16px;background:var(--s2);border:1px solid var(--border);margin:14px 0 6px;display:flex;}}
+.tug-bear{{background:var(--red);}} .tug-bull{{background:var(--green);flex:1;}}
+.tug-mid{{position:absolute;left:50%;top:-4px;bottom:-4px;width:2px;background:var(--text);}}
+.tug-lbl{{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;margin-bottom:4px;}}
+.debate-verdict{{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--text);margin-top:12px;border-top:1px solid var(--border);padding-top:10px;}}
+.risk-card{{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 16px 10px;margin-bottom:12px;}}
+.rc-head{{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:11.5px;letter-spacing:.14em;padding:12px 0 8px;border-bottom:1px solid var(--border);text-transform:uppercase;}}
+.winrate{{display:flex;justify-content:space-between;align-items:center;background:var(--s2);border:1px solid var(--border);padding:13px 16px;margin-bottom:12px;}}
+.wr-label{{font-size:12px;color:var(--muted);}} .wr-val{{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--gold);}}
+.trend-fold{{background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-bottom:12px;overflow:hidden;}}
+.trend-fold summary{{cursor:pointer;padding:13px 16px;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.06em;color:var(--muted);list-style:none;text-transform:uppercase;}}
 .trend-fold summary::-webkit-details-marker{{display:none;}}
 .trend-fold[open] summary{{border-bottom:1px solid var(--border);color:var(--text);}}
 .detail{{padding:4px 16px;}}
 .drow{{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}}
 .drow:last-child{{border-bottom:none;}}
 .drow > span:first-child{{color:var(--muted);flex:1;}}
-.dval{{font-family:'IBM Plex Mono',monospace;color:var(--text);}}
+.dval{{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text);}}
 .dsc{{font-family:'IBM Plex Mono',monospace;font-size:12px;width:54px;text-align:right;}}
-.note{{font-size:11.5px;color:var(--dim);line-height:1.6;margin-top:8px;}}
-.playbook{{background:var(--s2);border-left:3px solid;border-radius:0 8px 8px 0;padding:13px 16px;margin-bottom:18px;font-size:13.5px;}}
+.note{{font-size:11.5px;color:var(--dim);line-height:1.7;margin:8px 0 16px;}}
+.playbook{{background:var(--s2);border-left:3px solid;padding:13px 16px;margin-bottom:18px;font-size:13.5px;}}
 .pk{{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px;}}
+.scope{{display:block;margin:2px auto 14px;}}
+.scope .ring{{fill:none;stroke:var(--b2);stroke-width:1;}}
+.scope .spoke{{stroke:var(--border);stroke-width:1;}}
+.scope .swp{{transform-origin:150px 150px;animation:spin 6s linear infinite;}}
+.scope .blip-t{{font-family:'IBM Plex Mono',monospace;font-size:11px;}}
 .rcards{{display:grid;grid-template-columns:1fr 1fr;gap:10px;}}
-.rcard{{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;}}
-.rcard.green{{border-color:rgba(63,185,80,.4);}} .rcard.amber{{border-color:rgba(216,163,34,.45);}} .rcard.red{{border-color:rgba(240,71,71,.5);}}
+.rcard{{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px;}}
+.rcard.green{{border-left:3px solid var(--green);}} .rcard.amber{{border-left:3px solid #d8a322;}} .rcard.red{{border-left:3px solid var(--red);}}
 .rc-top{{display:flex;justify-content:space-between;align-items:center;gap:8px;}}
-.rc-name{{font-family:'Oswald',sans-serif;font-size:15px;}}
-.badge{{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.1em;padding:3px 7px;border-radius:5px;text-transform:uppercase;}}
-.badge.green{{background:rgba(63,185,80,.12);color:#3fb950;}} .badge.amber{{background:rgba(216,163,34,.12);color:#d8a322;}} .badge.red{{background:rgba(240,71,71,.12);color:#f04747;}} .badge.none{{background:var(--s2);color:var(--dim);}}
-.rc-val{{font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;margin:8px 0 2px;}} .rc-val .u{{font-size:12px;color:var(--muted);margin-left:4px;}}
+.rc-name{{font-family:'Noto Sans KR',sans-serif;font-weight:500;font-size:14px;}}
+.badge{{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.1em;padding:3px 7px;text-transform:uppercase;}}
+.badge.green{{background:rgba(52,199,123,.1);color:var(--green);}} .badge.amber{{background:rgba(216,163,34,.1);color:#d8a322;}} .badge.red{{background:rgba(233,86,86,.1);color:var(--red);}} .badge.none{{background:var(--s2);color:var(--dim);}}
+.rc-val{{font-family:'IBM Plex Mono',monospace;font-size:23px;font-weight:600;margin:8px 0 2px;}} .rc-val .u{{font-size:12px;color:var(--dim);margin-left:4px;}}
 .rc-thr{{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);}}
-.foot{{margin-top:26px;padding-top:16px;border-top:1px solid var(--border);font-size:11.5px;color:var(--dim);line-height:1.6;}}
-@media(max-width:480px){{.rcards{{grid-template-columns:1fr;}}}}
+.vhero{{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:6px;padding:18px 20px;margin-bottom:12px;}}
+.veq{{font-family:'Poppins',sans-serif;font-weight:700;font-size:44px;line-height:1;margin-top:4px;}}
+.vchip{{display:inline-block;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px;padding:5px 11px;border:1px solid;margin-left:10px;vertical-align:14px;}}
+.vchip.up{{color:var(--green);background:rgba(52,199,123,.08);border-color:rgba(52,199,123,.35);}}
+.vchip.dn{{color:var(--red);background:rgba(233,86,86,.08);border-color:rgba(233,86,86,.35);}}
+.eqcurve{{display:block;width:100%;height:86px;margin:14px 0 4px;}}
+.vstats{{display:flex;gap:10px;margin-bottom:12px;}}
+.vcell{{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:13px 15px;}}
+.vcell .k{{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;}}
+.vcell .v{{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:21px;margin-top:5px;}}
+.rec{{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}}
+.rec:last-child{{border-bottom:none;}}
+.rec .d{{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);width:46px;flex:none;}}
+.rec .sig{{width:104px;flex:none;font-weight:700;font-size:12.5px;}}
+.rec .sig.L{{color:var(--green);}} .rec .sig.S{{color:var(--dim);font-weight:400;}} .rec .sig.W{{color:var(--dim);font-weight:400;}}
+.rec .mv{{flex:1;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:12px;}}
+.rec .pl{{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px;width:74px;text-align:right;}}
+.rec .hit{{flex:none;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:14px;width:18px;text-align:center;}}
+.foot{{margin-top:26px;padding-top:16px;border-top:1px solid var(--border);font-size:11.5px;color:var(--dim);line-height:1.7;}}
+@media(max-width:480px){{.rcards{{grid-template-columns:1fr;}} .stamp{{display:none;}}}}
 </style></head><body><div class="wrap">
-<header><div class="eyebrow">Market Radar · Auto</div><h1>시장 레이더</h1><div class="stamp">자동 수집 · {now}</div></header>
+<header>
+  <svg class="glyph" viewBox="0 0 38 38"><circle cx="19" cy="19" r="17" fill="none" stroke="#dba642" stroke-width="1.6"/><circle cx="19" cy="19" r="10" fill="none" stroke="#2a3648" stroke-width="1"/><g class="sw" style="transform-origin:19px 19px"><line x1="19" y1="19" x2="34" y2="10" stroke="#dba642" stroke-width="1.6"/></g><circle cx="25" cy="13" r="2.2" fill="#e95656"/></svg>
+  <div class="hgroup"><h1>MARKET RADAR</h1><div class="eyebrow">시장 레이더 · AUTO INTEL</div></div>
+  <div class="stamp">{now}</div>
+</header>
 {err}
 <div class="tabs">
-  <div class="tab active" data-t="risk">위험감지</div>
-  <div class="tab" data-t="sp">S&amp;P 500</div>
-  <div class="tab" data-t="nq">나스닥</div>
-  <div class="tab" data-t="val">검증</div>
+  <div class="tab active" data-i="0">레이더</div>
+  <div class="tab" data-i="1">S&amp;P 500</div>
+  <div class="tab" data-i="2">나스닥</div>
+  <div class="tab" data-i="3">검증</div>
+  <div class="swipehint">◂ 스와이프 ▸</div>
 </div>
-<div class="panel active" id="p-risk">{rtab}</div>
+<div class="panels" id="panels">
+<div class="panel" id="p-risk">{rtab}</div>
 <div class="panel" id="p-sp">{sptab}</div>
 <div class="panel" id="p-nq">{nqtab}</div>
 <div class="panel" id="p-val">{vtab}</div>
-<div class="foot"><b>최종 판정은 추세 점수에 위험 게이트를 적용한 값이며 매매 신호가 아닙니다.</b> 위험모델은 페이퍼 검증 전입니다. 종가 기준이라 장중 실시간과 차이가 있습니다.</div>
+</div>
+<div class="foot"><b>최종 판정은 추세 점수에 위험 게이트를 적용한 값이며 매매 신호가 아닙니다.</b> 위험모델은 페이퍼 검증 중입니다. 종가 기준이라 장중 실시간과 차이가 있습니다.</div>
 </div>
 <script>
-document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
-  t.classList.add('active');
-  document.getElementById('p-'+t.dataset.t).classList.add('active');
-}}));
+const P=document.getElementById('panels'), T=[...document.querySelectorAll('.tab')];
+T.forEach(t=>t.addEventListener('click',()=>{{P.scrollTo({{left:P.clientWidth*(+t.dataset.i),behavior:'smooth'}});}}));
+P.addEventListener('scroll',()=>{{const i=Math.round(P.scrollLeft/P.clientWidth);
+T.forEach((t,j)=>t.classList.toggle('active',j===i));}},{{passive:true}});
 </script>
 {tp_js}
 </body></html>"""
