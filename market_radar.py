@@ -1346,6 +1346,20 @@ def run_backtest():
             if len(r) < n + 1: n = len(r) - 1
             return float(r.iloc[-1] - r.iloc[-1-n])
 
+        # 변형 실험용 사전계산 (200MA · RSI2 · 연속2일하락 · 실현변동성 레짐)
+        pre = {}
+        for tk in ("SPY", "QQQ"):
+            px = data[tk]["Close"]
+            ma200 = px.rolling(200).mean()
+            delta = px.diff(); up = delta.clip(lower=0); dn = (-delta).clip(lower=0)
+            u2 = up.rolling(2).mean(); d2 = dn.rolling(2).mean()
+            rsi2 = 100 - 100 / (1 + u2 / d2.replace(0, 1e-12))
+            down2 = (px < px.shift(1)) & (px.shift(1) < px.shift(2))
+            pre[tk] = dict(ma200=ma200, rsi2=rsi2, down2=down2)
+        _r = spy["Close"].pct_change()
+        _rv20 = _r.rolling(20).std(); _rvmed = _rv20.rolling(100).median()
+        hi_vol = (_rv20 > _rvmed)
+
         obs = {"SPY": [], "QQQ": []}
         for t in range(START, N - 1):
             v_t = float(vix.iloc[t]) if vix is not None and vix.iloc[t] == vix.iloc[t] else None
@@ -1368,7 +1382,14 @@ def run_backtest():
                 except Exception:
                     continue
                 c0 = float(df["Close"].iloc[t]); c1 = float(df["Close"].iloc[t+1]); o1 = float(df["Open"].iloc[t+1])
+                c2v = float(df["Close"].iloc[t+2]) if t + 2 < N else None
+                pma = pre[tk]["ma200"].iloc[t]; prs = pre[tk]["rsi2"].iloc[t]
                 obs[tk].append(dict(d=str(idx[t].date()), s=b["score"], c=(c1/c0-1)*100, o=(c1/o1-1)*100,
+                                    o2=((c2v/o1-1)*100 if c2v is not None else None),
+                                    ma200=bool(c0 > pma) if pma == pma else False,
+                                    dn2=bool(pre[tk]["down2"].iloc[t]),
+                                    rsi2=(float(prs) if prs == prs else None),
+                                    hv=bool(hi_vol.iloc[t]) if hi_vol.iloc[t] == hi_vol.iloc[t] else False,
                                     cta=inst["cta"]["tier"], it=inst["tier"], v=v_t))
 
         ACCT = 2000.0
@@ -1403,13 +1424,44 @@ def run_backtest():
                     ac = sum(r["c"] for r in sub)/len(sub)
                     rep.append(f"  {tier:19s} n={len(sub):3d} 승률 {wr:5.1f}% CI({ci[0]}~{ci[1]}) C2C{ac:+.3f}%")
                     R["cta" if key == "cta" else "inst"][tier] = dict(n=len(sub), win=round(wr,1), ci=list(ci), c2c=round(ac,3))
-            for nm, fn in (("VIX<20", lambda v: v is not None and v < 20), ("VIX>=20", lambda v: v is not None and v >= 20)):
-                sub = [r for r in rows if fn(r["v"]) and (r["s"] >= 56 or r["s"] <= 45)]
+            for nm, fn in (("VIX<20", lambda r: r["v"] is not None and r["v"] < 20), ("VIX>=20", lambda r: r["v"] is not None and r["v"] >= 20),
+                           ("저변동RV", lambda r: r["v"] is None and not r["hv"]), ("고변동RV", lambda r: r["v"] is None and r["hv"])):
+                sub = [r for r in rows if fn(r) and (r["s"] >= 56 or r["s"] <= 45)]
                 if not sub: continue
                 hits = sum(1 for r in sub if (r["c"] < 0) == (r["s"] >= 56))
                 wr = hits/len(sub)*100; ci = _wilson(hits, len(sub))
                 rep.append(f"  레짐 {nm:8s} n={len(sub):3d} 승률 {wr:5.1f}% CI({ci[0]}~{ci[1]})")
                 R["regime"][nm] = dict(n=len(sub), win=round(wr,1), ci=list(ci))
+
+            # ─ 변형 실험실 (A~G) — 같은 표본에 전략 변형 나란히 ─
+            def _mk(rule, fld):
+                eq2 = ACCT; pk = ACCT; dd = 0.0; ws = ls = 0.0; w = l = 0
+                for r in rows:
+                    ret = r.get(fld)
+                    if ret is None: continue
+                    pos = rule(r); pnl = pos * ret / 100.0
+                    eq2 += pnl; pk = max(pk, eq2); dd = min(dd, eq2 - pk)
+                    if pos > 0:
+                        if pnl > 0: w += 1; ws += pnl
+                        elif pnl < 0: l += 1; ls += pnl
+                return dict(trades=w+l, pnl=round(eq2-ACCT,2), win=w, loss=l,
+                            winrate=(round(w/(w+l)*100,1) if w+l else None),
+                            win_sum=round(ws,2), loss_sum=round(ls,2), max_dd=round(dd,2))
+            VAR = [
+                ("A_현행(<=45롱)",    lambda r: ACCT if r["s"]<=25 else ACCT/2 if r["s"]<=45 else 0, "o"),
+                ("B_집중(<=25만)",    lambda r: ACCT if r["s"]<=25 else 0, "o"),
+                ("C_B+200MA",        lambda r: ACCT if r["s"]<=25 and r["ma200"] else 0, "o"),
+                ("D_C+역발상76+",    lambda r: (ACCT if r["s"]<=25 and r["ma200"] else 0) + (ACCT/2 if r["s"]>=76 and r["ma200"] else 0), "o"),
+                ("E_C_2일보유",      lambda r: ACCT if r["s"]<=25 and r["ma200"] else 0, "o2"),
+                ("F_C+연속2일하락",  lambda r: ACCT if r["s"]<=25 and r["ma200"] and r["dn2"] else 0, "o"),
+                ("G_C+RSI2<15",      lambda r: ACCT if r["s"]<=25 and r["ma200"] and r["rsi2"] is not None and r["rsi2"]<15 else 0, "o"),
+            ]
+            R["variants"] = {}
+            rep.append("  ─ 변형 실험실 ($2,000·롱온리) ─")
+            for vnm, rule, fld in VAR:
+                st = _mk(rule, fld)
+                R["variants"][vnm] = st
+                rep.append(f"  {vnm:16s} n={st['trades']:3d} 손익 {st['pnl']:+8.2f} 승률 {st['winrate'] if st['winrate'] is not None else '—'}% MaxDD {st['max_dd']:.2f}")
             eq = ACCT; peak = ACCT; mdd = 0.0; wd = ld = 0.0; wn = ln_ = fl = 0
             for r in rows:
                 pnl = sized(r["s"]) * r["o"] / 100.0
