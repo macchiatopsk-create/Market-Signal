@@ -498,7 +498,7 @@
    "sp_r": 0.727,
    "sp_ret1": 0.873,
    "sp_ret2": 0.393,
-   "sp_ret5": null,
+   "sp_ret5": 0.93,
    "sp_oc1": 0.339,
    "sp_mfe1": 1.023,
    "sp_mae1": -0.353,
@@ -525,7 +525,7 @@
    "nq_r": null,
    "nq_ret1": 1.434,
    "nq_ret2": -0.445,
-   "nq_ret5": null,
+   "nq_ret5": 1.499,
    "nq_oc1": 0.434,
    "nq_mfe1": null,
    "nq_mae1": null,
@@ -671,7 +671,7 @@
    "sp_dir_hit": true,
    "sp_r": 0.582,
    "sp_ret1": 0.686,
-   "sp_ret2": null,
+   "sp_ret2": 0.847,
    "sp_ret5": null,
    "sp_oc1": 0.423,
    "sp_mfe1": 0.686,
@@ -698,7 +698,7 @@
    "nq_dir_hit": true,
    "nq_r": 0.79,
    "nq_ret1": 1.511,
-   "nq_ret2": null,
+   "nq_ret2": 1.664,
    "nq_ret5": null,
    "nq_oc1": 0.543,
    "nq_mfe1": 1.59,
@@ -727,15 +727,15 @@
    "sp_high": 751.97,
    "sp_low": 745.59,
    "sp_atr": 1.105,
-   "sp_next_hit": null,
-   "sp_dir_hit": null,
-   "sp_r": null,
-   "sp_ret1": null,
+   "sp_next_hit": false,
+   "sp_dir_hit": false,
+   "sp_r": 0.0,
+   "sp_ret1": 0.0,
    "sp_ret2": null,
    "sp_ret5": null,
-   "sp_oc1": null,
-   "sp_mfe1": null,
-   "sp_mae1": null,
+   "sp_oc1": 0.583,
+   "sp_mfe1": 0.035,
+   "sp_mae1": 0.814,
    "sp_trade_r": null,
    "sp_tp1_hit": null,
    "sp_tp2_hit": null,
@@ -756,6 +756,70 @@
    "nq_high": 724.23,
    "nq_low": 715.12,
    "nq_atr": 1.826,
+   "nq_next_hit": false,
+   "nq_dir_hit": false,
+   "nq_r": 0.0,
+   "nq_ret1": 0.0,
+   "nq_ret2": null,
+   "nq_ret5": null,
+   "nq_oc1": 0.689,
+   "nq_mfe1": 0.131,
+   "nq_mae1": 1.127,
+   "nq_trade_r": null,
+   "nq_tp1_hit": null,
+   "nq_tp2_hit": null,
+   "nq_sl_hit": null
+  },
+  {
+   "date": "2026-07-10",
+   "graded": true,
+   "sp_next_score": 16,
+   "sp_next_label": "BULLISH EDGE",
+   "sp_trend_score": 93,
+   "sp_risk_score": 0,
+   "sp_inst_tier": "NEUTRAL",
+   "sp_inst_stress": 2,
+   "sp_cta_score": 15,
+   "sp_cta_tier": "CTA LONG",
+   "sp_final": "STRONG BUY",
+   "sp_conviction": "DECISIVE",
+   "sp_dwinner": "BULL",
+   "sp_ma200": true,
+   "sp_close": 751.71,
+   "sp_open": 747.35,
+   "sp_high": 751.97,
+   "sp_low": 745.59,
+   "sp_atr": 1.105,
+   "sp_next_hit": null,
+   "sp_dir_hit": null,
+   "sp_r": null,
+   "sp_ret1": null,
+   "sp_ret2": null,
+   "sp_ret5": null,
+   "sp_oc1": null,
+   "sp_mfe1": null,
+   "sp_mae1": null,
+   "sp_trade_r": null,
+   "sp_tp1_hit": null,
+   "sp_tp2_hit": null,
+   "sp_sl_hit": null,
+   "nq_next_score": 24,
+   "nq_next_label": "BULLISH EDGE",
+   "nq_trend_score": 91,
+   "nq_risk_score": 0,
+   "nq_inst_tier": "NEUTRAL",
+   "nq_inst_stress": 3,
+   "nq_cta_score": 50,
+   "nq_cta_tier": "CTA NEUTRAL",
+   "nq_final": "STRONG BUY",
+   "nq_conviction": "DECISIVE",
+   "nq_dwinner": "BULL",
+   "nq_ma200": true,
+   "nq_close": 723.28,
+   "nq_open": 718.33,
+   "nq_high": 724.23,
+   "nq_low": 715.13,
+   "nq_atr": 1.826,
    "nq_next_hit": null,
    "nq_dir_hit": null,
    "nq_r": null,
@@ -772,8 +836,8 @@
   }
  ],
  "backtest": {
-  "at": "2026-07-09 20:42 ET",
-  "report": "기간 2024-07-22 ~ 2026-07-08 · in-sample 주의 · 비용 제외\n\n[SPY] 표본 492일\n  Bullish Edge n= 73 승률  67.1% CI(55.7~76.8) C2C+0.231% O2C+0.113%\n  Mild Bullish n=147 승률  53.1% CI(45.0~60.9) C2C+0.016% O2C+0.010%\n  Neutral      n= 57 (채점 제외)\n  Mild Bearish n=110 승률  50.9% CI(41.7~60.1) C2C-0.080% O2C-0.086%\n  Bearish Edge n=105 승률  39.0% CI(30.3~48.6) C2C+0.202% O2C+0.122%\n  CTA FORCED SELLING  n= 23 승률  30.4% CI(15.6~50.9) C2C+0.336%\n  CTA LONG            n=296 승률  54.4% CI(48.7~60.0) C2C+0.035%\n  CTA SELLING         n= 20 승률  35.0% CI(18.1~56.7) C2C+0.211%\n  RISK OFF            n=193 승률  50.3% CI(43.3~57.2) C2C-0.071%\n  RISK ON             n= 22 승률  59.1% CI(38.7~76.7) C2C+0.267%\n  STRESS              n= 59 승률  32.2% CI(21.7~44.9) C2C+0.340%\n  레짐 저변동RV    n=206 승률  53.4% CI(46.6~60.1)\n  레짐 고변동RV    n=229 승률  49.8% CI(43.4~56.2)\n  ─ 변형 실험실 ($2,000·롱온리) ─\n  A_현행(<=45롱)      n=219 손익  +180.29 승률 55.3% MaxDD -60.22\n  B_집중(<=25만)      n= 73 손익  +164.89 승률 61.6% MaxDD -43.60\n  C_B+200MA        n= 73 손익  +164.89 승률 61.6% MaxDD -43.60\n  D_C+역발상76+       n=138 손익  +199.76 승률 60.9% MaxDD -51.01\n  E_C_2일보유         n= 72 손익  +248.90 승률 66.7% MaxDD -106.68\n  F_C+연속2일하락       n=  7 손익    +5.07 승률 71.4% MaxDD -24.97\n  G_C+RSI2<15      n=  7 손익    +5.07 승률 71.4% MaxDD -24.97\n  H_D+Mild$500     n=280 손익  +205.25 승률 56.1% MaxDD -48.36\n  페이퍼($2,000·O2C) 최종 $2,180.29 (+180.29) WIN 121일 +670.39 LOSS 98일 -490.10 MaxDD -60.22\n\n[QQQ] 표본 492일\n  Bullish Edge n= 67 승률  68.7% CI(56.8~78.5) C2C+0.329% O2C+0.119%\n  Mild Bullish n=156 승률  55.8% CI(47.9~63.3) C2C+0.055% O2C+0.012%\n  Neutral      n= 52 (채점 제외)\n  Mild Bearish n=114 승률  43.9% CI(35.1~53.0) C2C+0.061% O2C-0.041%\n  Bearish Edge n=103 승률  42.7% CI(33.6~52.4) C2C+0.219% O2C+0.131%\n  CTA FORCED SELLING  n= 16 승률  43.8% CI(23.1~66.8) C2C+0.368%\n  CTA LONG            n=261 승률  55.9% CI(49.9~61.8) C2C+0.051%\n  CTA SELLING         n= 26 승률  34.6% CI(19.4~53.8) C2C+0.357%\n  RISK OFF            n=191 승률  50.3% CI(43.2~57.3) C2C-0.098%\n  RISK ON             n= 21 승률  61.9% CI(40.9~79.2) C2C+0.298%\n  STRESS              n= 62 승률  38.7% CI(27.6~51.2) C2C+0.398%\n  레짐 저변동RV    n=213 승률  53.5% CI(46.8~60.1)\n  레짐 고변동RV    n=227 승률  49.8% CI(43.3~56.2)\n  ─ 변형 실험실 ($2,000·롱온리) ─\n  A_현행(<=45롱)      n=223 손익  +178.11 승률 57.0% MaxDD -145.35\n  B_집중(<=25만)      n= 67 손익  +158.82 승률 61.2% MaxDD -91.05\n  C_B+200MA        n= 67 손익  +158.82 승률 61.2% MaxDD -91.05\n  D_C+역발상76+       n=131 손익  +232.59 승률 61.1% MaxDD -93.22\n  E_C_2일보유         n= 67 손익  +221.01 승률 65.7% MaxDD -170.28\n  F_C+연속2일하락       n=  3 손익   +10.38 승률 66.7% MaxDD -0.59\n  G_C+RSI2<15      n=  3 손익   +10.38 승률 66.7% MaxDD -0.59\n  H_D+Mild$500     n=284 손익  +242.30 승률 57.7% MaxDD -83.98\n  페이퍼($2,000·O2C) 최종 $2,178.11 (+178.11) WIN 127일 +933.13 LOSS 96일 -755.02 MaxDD -145.35",
+  "at": "2026-07-10 01:59 ET",
+  "report": "기간 2024-07-22 ~ 2026-07-08 · in-sample 주의 · 비용 제외\n\n[SPY] 표본 492일\n  Bullish Edge n= 73 승률  67.1% CI(55.7~76.8) C2C+0.231% O2C+0.113%\n  Mild Bullish n=147 승률  53.1% CI(45.0~60.9) C2C+0.016% O2C+0.010%\n  Neutral      n= 56 (채점 제외)\n  Mild Bearish n=111 승률  50.5% CI(41.3~59.6) C2C-0.072% O2C-0.081%\n  Bearish Edge n=105 승률  39.0% CI(30.3~48.6) C2C+0.202% O2C+0.122%\n  CTA FORCED SELLING  n= 23 승률  30.4% CI(15.6~50.9) C2C+0.336%\n  CTA LONG            n=296 승률  54.4% CI(48.7~60.0) C2C+0.035%\n  CTA SELLING         n= 20 승률  35.0% CI(18.1~56.7) C2C+0.211%\n  RISK OFF            n=193 승률  50.3% CI(43.3~57.2) C2C-0.071%\n  RISK ON             n= 22 승률  59.1% CI(38.7~76.7) C2C+0.267%\n  STRESS              n= 59 승률  32.2% CI(21.7~44.9) C2C+0.340%\n  레짐 저변동RV    n=207 승률  53.1% CI(46.3~59.8)\n  레짐 고변동RV    n=229 승률  49.8% CI(43.4~56.2)\n  ─ 변형 실험실 ($2,000·롱온리) ─\n  A_현행(<=45롱)      n=219 손익  +180.29 승률 55.3% MaxDD -60.22\n  B_집중(<=25만)      n= 73 손익  +164.89 승률 61.6% MaxDD -43.60\n  C_B+200MA        n= 73 손익  +164.89 승률 61.6% MaxDD -43.60\n  D_C+역발상76+       n=138 손익  +199.76 승률 60.9% MaxDD -51.01\n  E_C_2일보유         n= 72 손익  +248.90 승률 66.7% MaxDD -106.68\n  F_C+연속2일하락       n=  7 손익    +5.07 승률 71.4% MaxDD -24.97\n  G_C+RSI2<15      n=  7 손익    +5.07 승률 71.4% MaxDD -24.97\n  H_D+Mild$500     n=280 손익  +205.25 승률 56.1% MaxDD -48.36\n  페이퍼($2,000·O2C) 최종 $2,205.25 (+205.25) WIN 157일 +730.90 LOSS 123일 -525.64 MaxDD -48.36\n\n[QQQ] 표본 492일\n  Bullish Edge n= 67 승률  68.7% CI(56.8~78.5) C2C+0.329% O2C+0.119%\n  Mild Bullish n=156 승률  55.8% CI(47.9~63.3) C2C+0.055% O2C+0.012%\n  Neutral      n= 52 (채점 제외)\n  Mild Bearish n=114 승률  43.9% CI(35.1~53.0) C2C+0.061% O2C-0.041%\n  Bearish Edge n=103 승률  42.7% CI(33.6~52.4) C2C+0.219% O2C+0.131%\n  CTA FORCED SELLING  n= 16 승률  43.8% CI(23.1~66.8) C2C+0.368%\n  CTA LONG            n=261 승률  55.9% CI(49.9~61.8) C2C+0.051%\n  CTA SELLING         n= 26 승률  34.6% CI(19.4~53.8) C2C+0.357%\n  RISK OFF            n=191 승률  50.3% CI(43.2~57.3) C2C-0.098%\n  RISK ON             n= 21 승률  61.9% CI(40.9~79.2) C2C+0.298%\n  STRESS              n= 62 승률  38.7% CI(27.6~51.2) C2C+0.398%\n  레짐 저변동RV    n=213 승률  53.5% CI(46.8~60.1)\n  레짐 고변동RV    n=227 승률  49.8% CI(43.3~56.2)\n  ─ 변형 실험실 ($2,000·롱온리) ─\n  A_현행(<=45롱)      n=223 손익  +178.05 승률 57.0% MaxDD -145.35\n  B_집중(<=25만)      n= 67 손익  +158.82 승률 61.2% MaxDD -91.05\n  C_B+200MA        n= 67 손익  +158.82 승률 61.2% MaxDD -91.05\n  D_C+역발상76+       n=131 손익  +232.59 승률 61.1% MaxDD -93.22\n  E_C_2일보유         n= 67 손익  +221.01 승률 65.7% MaxDD -170.28\n  F_C+연속2일하락       n=  3 손익   +10.38 승률 66.7% MaxDD -0.59\n  G_C+RSI2<15      n=  3 손익   +10.38 승률 66.7% MaxDD -0.59\n  H_D+Mild$500     n=284 손익  +242.27 승률 57.7% MaxDD -83.98\n  페이퍼($2,000·O2C) 최종 $2,242.27 (+242.27) WIN 164일 +985.28 LOSS 120일 -743.00 MaxDD -83.98",
   "data": {
    "period": [
     "2024-07-22",
@@ -804,17 +868,17 @@
        "o2c": 0.01
       },
       "Neutral": {
-       "n": 57
+       "n": 56
       },
       "Mild Bearish": {
-       "n": 110,
-       "win": 50.9,
+       "n": 111,
+       "win": 50.5,
        "ci": [
-        41.7,
-        60.1
+        41.3,
+        59.6
        ],
-       "c2c": -0.08,
-       "o2c": -0.086
+       "c2c": -0.072,
+       "o2c": -0.081
       },
       "Bearish Edge": {
        "n": 105,
@@ -887,11 +951,11 @@
      },
      "regime": {
       "저변동RV": {
-       "n": 206,
-       "win": 53.4,
+       "n": 207,
+       "win": 53.1,
        "ci": [
-        46.6,
-        60.1
+        46.3,
+        59.8
        ]
       },
       "고변동RV": {
@@ -904,14 +968,14 @@
       }
      },
      "paper": {
-      "final": 2180.29,
-      "pnl": 180.29,
-      "wins": 121,
-      "losses": 98,
-      "flat": 272,
-      "win_sum": 670.39,
-      "loss_sum": -490.1,
-      "max_dd": -60.22
+      "final": 2205.25,
+      "pnl": 205.25,
+      "wins": 157,
+      "losses": 123,
+      "flat": 211,
+      "win_sum": 730.9,
+      "loss_sum": -525.64,
+      "max_dd": -48.36
      },
      "variants": {
       "A_현행(<=45롱)": {
@@ -1120,23 +1184,23 @@
       }
      },
      "paper": {
-      "final": 2178.11,
-      "pnl": 178.11,
-      "wins": 127,
-      "losses": 96,
-      "flat": 269,
-      "win_sum": 933.13,
-      "loss_sum": -755.02,
-      "max_dd": -145.35
+      "final": 2242.27,
+      "pnl": 242.27,
+      "wins": 164,
+      "losses": 120,
+      "flat": 208,
+      "win_sum": 985.28,
+      "loss_sum": -743.0,
+      "max_dd": -83.98
      },
      "variants": {
       "A_현행(<=45롱)": {
        "trades": 223,
-       "pnl": 178.11,
+       "pnl": 178.05,
        "win": 127,
        "loss": 96,
        "winrate": 57.0,
-       "win_sum": 933.13,
+       "win_sum": 933.07,
        "loss_sum": -755.02,
        "max_dd": -145.35
       },
@@ -1202,11 +1266,11 @@
       },
       "H_D+Mild$500": {
        "trades": 284,
-       "pnl": 242.3,
+       "pnl": 242.27,
        "win": 164,
        "loss": 120,
        "winrate": 57.7,
-       "win_sum": 985.31,
+       "win_sum": 985.28,
        "loss_sum": -743.0,
        "max_dd": -83.98
       }
