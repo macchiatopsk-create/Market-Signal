@@ -24,7 +24,8 @@ except ImportError:
     print("필요: pip install yfinance requests pandas"); sys.exit(1)
 
 FRED_API_KEY = os.environ.get("FRED_API_KEY", "여기에_FRED_키_붙여넣기")
-NY = ZoneInfo("America/New_York")          # GitHub 러너는 UTC라 거래일 기준은 뉴욕으로
+NY = ZoneInfo("America/New_York")
+MODEL_VERSION = "H-1.0"      # 전략·가중치·구간·사이징 변경 시 반드시 버전 업 (history 혼합 방지)          # GitHub 러너는 UTC라 거래일 기준은 뉴욕으로
 BASE = os.path.dirname(os.path.abspath(__file__))
 OUT_HTML = os.path.join(BASE, "dashboard.html")
 HIST_PATH = os.path.join(BASE, "radar_history.json")
@@ -761,7 +762,7 @@ def _regrade(hist):
                     elif ns <= 45: p[mk + "_next_hit"] = bool(cf > pc)
 
 def grade_and_record(hist, today, pred):
-    row = {"date": today, "graded": True}
+    row = {"date": today, "graded": True, "model_version": MODEL_VERSION}
     for mk in ("sp", "nq"):
         d = pred[mk]
         row.update({
