@@ -235,7 +235,7 @@ RISK_TIER_COLOR = {"LOW": "#3fb950", "ELEVATED": "#d8a322", "HIGH": "#f0813f", "
 def _empty_risk():
     return dict(score=0, tier="LOW", factors=[], change=0.0, zone="eq", trend="range",
                 close=None, close_pos=0.5, open=None, high=None, low=None, atr=None,
-                prev_high=None, prev_low=None, prev_close=None, cond={})
+                prev_high=None, prev_low=None, prev_close=None, above_ma200=True, cond={})
 
 def _empty_inst():
     return dict(tier="NEUTRAL", stress=0, cat={},
@@ -316,6 +316,7 @@ def compute_risk_bias(ticker, macro, market):
                 close=round(close, 2), close_pos=round(close_pos, 2), open=round(today_open, 2),
                 high=round(today_high, 2), low=round(today_low, 2), atr=atr_pct,
                 prev_high=round(prev_high, 2), prev_low=round(prev_low, 2), prev_close=round(prev_close, 2),
+                above_ma200=bool(close > float(df["Close"].rolling(200).mean().iloc[-1])) if len(df) >= 200 else True,
                 cond=cond)
 
 # ===========================================================================
@@ -504,10 +505,10 @@ CONV_COLOR = {"DECISIVE":"#2bd47e","CLEAR":"#46b1c9","CONTESTED":"#f0813f","QUIE
 # ===========================================================================
 def next_day_bias_label(score):
     if score <= 25:   return "BULLISH EDGE", "Long Favorable / Dip Buy (백테스트 67~69% 적중)"
-    elif score <= 45: return "MILD BULLISH", "Long 가능하지만 사이즈 작게"
+    elif score <= 45: return "MILD BULLISH", "Long 소액 ($500 급 — 기여 작음, 곡선 완충용)"
     elif score <= 55: return "NEUTRAL", "애매함 / 무리 금지"
-    elif score <= 75: return "MILD BEARISH", "롱 자제 / 관망 (숏 봉인 — 검증상 엣지 없음)"
-    else:             return "BEARISH EDGE", "롱 금지 · 추격숏 금지 (검증상 다음날 반등 우세 ~61%)"
+    elif score <= 75: return "MILD BEARISH", "관망 (숏 봉인 — 검증상 엣지 없음)"
+    else:             return "BEARISH EDGE", "역발상 소액 롱 구간(200MA 위·검증 61%) · 추격숏 금지"
 
 def compute_next_day_bias(risk):
     c = risk.get("cond", {})
@@ -770,6 +771,7 @@ def grade_and_record(hist, today, pred):
             mk + "_inst_tier": d["inst_tier"], mk + "_inst_stress": d["inst_stress"],
             mk + "_cta_score": d["cta_score"], mk + "_cta_tier": d["cta_tier"], mk + "_final": d["final"],
             mk + "_conviction": d.get("conviction"), mk + "_dwinner": d.get("dwinner"),
+            mk + "_ma200": d.get("ma200", True),
             mk + "_close": d["close"], mk + "_open": d["open"], mk + "_high": d["high"], mk + "_low": d["low"],
             mk + "_atr": d["atr"],
             mk + "_next_hit": None, mk + "_dir_hit": None, mk + "_r": None,
@@ -845,27 +847,32 @@ def _inst_dir(o):
 def _paper_sim(hist, mk):
     """라이브 페이퍼 계좌 ($2,000 · 롱온리 사이징 · 다음날 O2C)."""
     ACCT = 2000.0
-    def sized(s):
-        if s is None: return 0.0
+    def sized(s, ma=True):                       # H 전략: 집중 + 역발상 + Mild 소액 (전부 200MA 위)
+        if s is None or not ma: return 0.0
         if s <= 25: return ACCT
-        if s <= 45: return ACCT/2
+        if s <= 45: return ACCT/4
+        if s >= 76: return ACCT/2                # 역발상 반등 롱
         return 0.0
     eq = ACCT; series = [ACCT]; win_s = loss_s = 0.0; wins = losses = 0; recent = []
     for h in hist:
         s = h.get(mk + "_next_score"); oc = h.get(mk + "_oc1")
         if oc is None:
             continue
-        pos = sized(s); pnl = pos * oc / 100.0
+        ma = h.get(mk + "_ma200", True)
+        pos = sized(s, ma); pnl = pos * oc / 100.0
         eq += pnl; series.append(eq)
         if pos > 0:
             if pnl > 0: wins += 1; win_s += pnl
             elif pnl < 0: losses += 1; loss_s += pnl
-        tag = ("산다 $2,000" if s is not None and s <= 25 else "산다 $1,000" if s is not None and s <= 45
-               else "판다·봉인" if s is not None and s >= 56 else "관망")
-        cls = "L" if (s is not None and s <= 45) else ("S" if (s is not None and s >= 56) else "W")
-        hit = None
-        if s is not None and s <= 45: hit = oc > 0
-        elif s is not None and s >= 56: hit = oc < 0          # 봉인이지만 채점은 계속
+        if pos > 0:
+            tag = ("산다 $2,000" if s <= 25 else "산다 $500" if s <= 45 else "산다 $1,000·역발상")
+            cls = "L"; hit = oc > 0
+        elif s is not None and s >= 76 and not ma:
+            tag = "관망 (MA아래·역발상 봉인)"; cls = "S"; hit = oc < 0
+        elif s is not None and 56 <= s <= 75:
+            tag = "관망"; cls = "S"; hit = oc < 0             # 약세신호 채점은 계속
+        else:
+            tag = "관망"; cls = "W"; hit = None
         recent.append(dict(d=str(h.get("date",""))[5:], tag=tag, cls=cls, oc=oc,
                            pnl=pnl if pos > 0 else None, hit=hit))
     n_dir = wins + losses
@@ -1208,7 +1215,8 @@ function computePlan(ticker, s){
                direction:"NO TRADE", status:"WAIT", entry:null, stop:null, tp1:null, tp2:null, tp3:null,
                invalid:"", invalidation:"", notes:[]};
   if (!usingIntraday) out.notes.push("전일값 = EOD 참조 (" + (b.refDate||"") + ")");
-  if (score>=76) out.direction="NO TRADE · 숏 봉인";
+  if (score>=76 && b.ma200) out.direction="CONTRARIAN LONG · $1,000";
+  else if (score>=76) out.direction="NO TRADE · MA아래 봉인";
   else if (score>=56) out.direction="NO TRADE · 관망";
   else if (score>=46) out.direction="BOTH ALLOWED";
   else if (score>=26) out.direction="LONG PREFERRED";
@@ -1239,9 +1247,13 @@ function computePlan(ticker, s){
     out.notes.push("Entry: OR High 돌파 또는 VWAP 눌림 반등");
     out.invalidation="VWAP 아래 5분봉 종가 이탈 또는 OR Low 이탈";
   }
-  if (score>=56) {
+  if (score>=76 && b.ma200) {
+    longPlan();
+    out.notes.push("역발상 반등 구간 — 소액($1,000 상당)만. 백테스트 61% 반등, 단 고위험(하락 지속 시 손절 엄수)");
+  }
+  else if (score>=56) {
     out.status="NO TRADE";
-    out.notes.push("숏 봉인 — 백테스트상 이 구간 다음날 반등 우세(~61%). 추격숏·신규롱 모두 금지, 관망");
+    out.notes.push(score>=76 ? "200MA 아래 — 역발상 봉인 (떨어지는 칼)" : "숏 봉인 — 이 구간 엣지 없음(백테스트). 관망");
   }
   else if (score<=45) longPlan();
   else {
@@ -1393,9 +1405,11 @@ def run_backtest():
                                     cta=inst["cta"]["tier"], it=inst["tier"], v=v_t))
 
         ACCT = 2000.0
-        def sized(s):                    # 롱온리 (백테스트 결과: 숏 구간 엣지 없음 → 봉인)
+        def sized(s, ma=True):           # H 전략 (집중+역발상+Mild$500, 200MA 게이트)
+            if not ma: return 0.0
             if s <= 25: return ACCT
-            if s <= 45: return ACCT/2
+            if s <= 45: return ACCT/4
+            if s >= 76: return ACCT/2
             return 0.0
         rep = [f"기간 {idx[START].date()} ~ {idx[N-2].date()} · in-sample 주의 · 비용 제외"]
         out = {"period": [str(idx[START].date()), str(idx[N-2].date())], "tickers": {}}
@@ -1467,9 +1481,9 @@ def run_backtest():
                 rep.append(f"  {vnm:16s} n={st['trades']:3d} 손익 {st['pnl']:+8.2f} 승률 {st['winrate'] if st['winrate'] is not None else '—'}% MaxDD {st['max_dd']:.2f}")
             eq = ACCT; peak = ACCT; mdd = 0.0; wd = ld = 0.0; wn = ln_ = fl = 0
             for r in rows:
-                pnl = sized(r["s"]) * r["o"] / 100.0
+                pnl = sized(r["s"], r.get("ma200", True)) * r["o"] / 100.0
                 eq += pnl; peak = max(peak, eq); mdd = min(mdd, eq - peak)
-                if sized(r["s"]) == 0: fl += 1
+                if sized(r["s"], r.get("ma200", True)) == 0: fl += 1
                 elif pnl > 0: wn += 1; wd += pnl
                 elif pnl < 0: ln_ += 1; ld += pnl
             R["paper"] = dict(final=round(eq,2), pnl=round(eq-ACCT,2), wins=wn, losses=ln_, flat=fl,
@@ -1783,6 +1797,7 @@ def main():
                     inst_tier=inst["tier"], inst_stress=inst["stress"],
                     cta_score=inst["cta"]["score"], cta_tier=inst["cta"]["tier"], final=d["fsig"],
                     conviction=d["debate"]["conviction"], dwinner=d["debate"]["winner"],
+                    ma200=risk.get("above_ma200", True),
                     close=risk["close"], open=risk["open"], high=risk["high"], low=risk["low"], atr=risk["atr"])
     pred = {"sp": _pred(spd, sp, sp_risk, inst_sp), "nq": _pred(nqd, nq, nq_risk, inst_nq)}
 
@@ -1812,9 +1827,9 @@ def main():
     nqtab = signal_tab("나스닥 100 · QQQ", nqd, bias_bucket_stats(hist, "nq"))
     vtab  = validation_tab(hist)
     tp_data = {
-        "SPY": dict(nextScore=spd["bias"]["score"], nextLabel=spd["bias"]["label"],
+        "SPY": dict(nextScore=spd["bias"]["score"], nextLabel=spd["bias"]["label"], ma200=sp_risk.get("above_ma200", True),
                     prevHigh=sp_risk["high"], prevLow=sp_risk["low"], prevClose=sp_risk["close"], refDate=today),
-        "QQQ": dict(nextScore=nqd["bias"]["score"], nextLabel=nqd["bias"]["label"],
+        "QQQ": dict(nextScore=nqd["bias"]["score"], nextLabel=nqd["bias"]["label"], ma200=nq_risk.get("above_ma200", True),
                     prevHigh=nq_risk["high"], prevLow=nq_risk["low"], prevClose=nq_risk["close"], refDate=today),
     }
     tp_js = tradeplan_script(tp_data)
