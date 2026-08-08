@@ -236,7 +236,7 @@ RISK_TIER_COLOR = {"LOW": "#3fb950", "ELEVATED": "#d8a322", "HIGH": "#f0813f", "
 def _empty_risk():
     return dict(score=0, tier="LOW", factors=[], change=0.0, zone="eq", trend="range",
                 close=None, close_pos=0.5, open=None, high=None, low=None, atr=None,
-                prev_high=None, prev_low=None, prev_close=None, above_ma200=True, cond={})
+                prev_high=None, prev_low=None, prev_close=None, above_ma200=True, ma125_pct=0.0, cond={})
 
 def _empty_inst():
     return dict(tier="NEUTRAL", stress=0, cat={},
@@ -318,6 +318,7 @@ def compute_risk_bias(ticker, macro, market):
                 high=round(today_high, 2), low=round(today_low, 2), atr=atr_pct,
                 prev_high=round(prev_high, 2), prev_low=round(prev_low, 2), prev_close=round(prev_close, 2),
                 above_ma200=bool(close > float(df["Close"].rolling(200).mean().iloc[-1])) if len(df) >= 200 else True,
+                ma125_pct=round((close / float(df["Close"].rolling(125).mean().iloc[-1]) - 1) * 100, 2) if len(df) >= 125 else 0.0,
                 cond=cond)
 
 # ===========================================================================
@@ -771,7 +772,7 @@ def grade_and_record(hist, today, pred):
             mk + "_inst_tier": d["inst_tier"], mk + "_inst_stress": d["inst_stress"],
             mk + "_cta_score": d["cta_score"], mk + "_cta_tier": d["cta_tier"], mk + "_final": d["final"],
             mk + "_conviction": d.get("conviction"), mk + "_dwinner": d.get("dwinner"),
-            mk + "_ma200": d.get("ma200", True),
+            mk + "_ma200": d.get("ma200", True), mk + "_fg": d.get("fg"),
             mk + "_close": d["close"], mk + "_open": d["open"], mk + "_high": d["high"], mk + "_low": d["low"],
             mk + "_atr": d["atr"],
             mk + "_next_hit": None, mk + "_dir_hit": None, mk + "_r": None,
@@ -1066,6 +1067,65 @@ def institutional_card(inst):
       <div class="edge-wr">{ctaf}</div>
     </div>"""
 
+# ===========================================================================
+# 공포 & 탐욕 게이지 (지수별 자체 계산 · 참고용 온도계 — 매매신호 아님, 미검증)
+#   0 극단적 공포 ←→ 100 극단적 탐욕. 기존 재료 6종 평균 (CNN 방식 유사).
+# ===========================================================================
+def compute_fear_greed(risk, inst, macro):
+    def cl(x): return max(0.0, min(100.0, x))
+    c = risk.get("cond", {})
+    vix = macro.get("vix"); oas = macro.get("hyoas")
+    mom  = cl(50 + risk.get("ma125_pct", 0.0) * 6)                      # 125일선 이격
+    vol  = cl(100 - (vix - 10) * 4) if vix is not None else 50.0        # VIX 온도
+    cred = 50 + (20 if c.get("credit_on") else -20 if c.get("credit_off") else 0)
+    if oas is not None: cred += 15 if oas < 3.5 else (-25 if oas > 5.0 else 0)
+    cred = cl(cred)
+    brd  = cl(50 + (20 if c.get("iwm_strong") else -20 if c.get("iwm_weak") else 0))   # 소형주 참여
+    strc = cl(100 - risk.get("score", 0))                               # 구조 균열 반전
+    cta  = cl(50 + inst.get("cta", {}).get("effective", 0) * 12)        # 추세 온도
+    score = round((mom + vol + cred + brd + strc + cta) / 6)
+    if score <= 25:   lab, col = "극단적 공포", "#e95656"
+    elif score <= 45: lab, col = "공포", "#f08c3c"
+    elif score <= 55: lab, col = "중립", "#d8a322"
+    elif score <= 75: lab, col = "탐욕", "#7cc36a"
+    else:             lab, col = "극단적 탐욕", "#34c77b"
+    return dict(score=score, label=lab, color=col,
+                parts=dict(모멘텀=round(mom), 변동성=round(vol), 신용=round(cred),
+                           소형주=round(brd), 구조=round(strc), 추세=round(cta)))
+
+def fg_gauge(d):
+    fg = d.get("fg")
+    if not fg: return ""
+    import math as _m
+    def pt(v, r=78):
+        a = _m.radians(180 - 1.8 * v)
+        return 100 + r * _m.cos(a), 100 - r * _m.sin(a)
+    zones = [(0, 25, "#e95656"), (25, 45, "#f08c3c"), (45, 55, "#d8a322"), (55, 75, "#7cc36a"), (75, 100, "#34c77b")]
+    arcs = ""
+    for a, b, cc in zones:
+        x1, y1 = pt(a); x2, y2 = pt(b)
+        arcs += f'<path d="M {x1:.1f} {y1:.1f} A 78 78 0 0 1 {x2:.1f} {y2:.1f}" stroke="{cc}" stroke-width="15" fill="none"/>'
+    nx, ny = pt(fg["score"], 60)
+    prevs = d.get("fg_prev") or {}
+    rows = ""
+    for k in ("지난 거래일", "일주일 전", "한 달 전"):
+        v = prevs.get(k)
+        rows += (f'<div class="drow"><span>{k}</span><span class="dval">{v if v is not None else "—"}</span></div>')
+    parts = " · ".join(f"{k}{v}" for k, v in fg["parts"].items())
+    return f"""<div class="risk-card">
+      <div class="rc-head" style="color:#dba642">FEAR &amp; GREED — 자체 계산 (참고용)</div>
+      <svg viewBox="0 0 200 118" style="display:block;max-width:260px;margin:10px auto 0">
+        {arcs}
+        <line x1="100" y1="100" x2="{nx:.1f}" y2="{ny:.1f}" stroke="#e6edf5" stroke-width="3"/>
+        <circle cx="100" cy="100" r="5" fill="#e6edf5"/>
+        <text x="100" y="86" text-anchor="middle" fill="{fg['color']}" font-size="26" font-weight="700" font-family="Poppins,sans-serif">{fg['score']}</text>
+      </svg>
+      <div style="text-align:center;font-weight:700;color:{fg['color']};margin:2px 0 10px">{fg['label']}</div>
+      {rows}
+      <div class="edge-wr" style="margin-top:8px">{parts}</div>
+      <div class="tp-foot">기존 신호 6종 합성 온도계 — 매매신호 아님 · 미검증 참고지표</div>
+    </div>"""
+
 def signal_tab(name, d, buckets):
     label, score100, detail = d["label"], d["score"], d["detail"]
     risk, inst = d["risk"], d["inst"]
@@ -1091,6 +1151,7 @@ def signal_tab(name, d, buckets):
       </div>
       <div class="sig-meta">위험 {risk['tier']} {risk['score']} · 기관 {inst['tier']} · {inst['cta']['tier']} · 종가 {risk['close']} ({risk['change']:+.1f}%)</div>
     </div>
+    {fg_gauge(d)}
     {debate_card(d['debate'])}
     <div class="tradeplan" id="tp-{d['ticker']}">
       <div class="tp-bar"><span class="hero-label">TRADE PLAN — Live Intraday</span><button class="tp-enable">🔔 알림</button></div>
@@ -1921,6 +1982,8 @@ def main():
 
     spd = build_tab_data("SPY", sp, sp_risk, inst_sp)
     nqd = build_tab_data("QQQ", nq, nq_risk, inst_nq)
+    spd["fg"] = compute_fear_greed(sp_risk, inst_sp, macro)
+    nqd["fg"] = compute_fear_greed(nq_risk, inst_nq, macro)
 
     def _pred(d, trend_sig, risk, inst):
         return dict(next_score=d["bias"]["score"], next_label=d["bias"]["label"],
@@ -1928,7 +1991,7 @@ def main():
                     inst_tier=inst["tier"], inst_stress=inst["stress"],
                     cta_score=inst["cta"]["score"], cta_tier=inst["cta"]["tier"], final=d["fsig"],
                     conviction=d["debate"]["conviction"], dwinner=d["debate"]["winner"],
-                    ma200=risk.get("above_ma200", True),
+                    ma200=risk.get("above_ma200", True), fg=d.get("fg", {}).get("score"),
                     close=risk["close"], open=risk["open"], high=risk["high"], low=risk["low"], atr=risk["atr"])
     pred = {"sp": _pred(spd, sp, sp_risk, inst_sp), "nq": _pred(nqd, nq, nq_risk, inst_nq)}
 
@@ -1953,6 +2016,11 @@ def main():
                   f, ensure_ascii=False, indent=1)
 
     now = dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET")
+    def _fg_prev(mk):
+        def at(k):
+            return hist[-k][mk + "_fg"] if len(hist) >= k and hist[-k].get(mk + "_fg") is not None else None
+        return {"지난 거래일": at(2), "일주일 전": at(6), "한 달 전": at(22)}
+    spd["fg_prev"] = _fg_prev("sp"); nqd["fg_prev"] = _fg_prev("nq")
     drift = compute_drift(hist, bt_data) if bt_data else {}
     rtab  = risk_tab(rvals, rst, lvl, red, amber)
     sptab = signal_tab("S&P 500 · SPY", spd, bias_bucket_stats(hist, "sp"))
