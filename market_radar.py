@@ -1507,7 +1507,10 @@ def run_backtest():
                 c2v = float(df["Close"].iloc[t+2]) if t + 2 < N else None
                 pma = pre[tk]["ma200"].iloc[t]; prs = pre[tk]["rsi2"].iloc[t]
                 pvr = pre[tk]["vr"].iloc[t]
+                try: _fg = compute_fear_greed(risk, inst, macro)["score"]
+                except Exception: _fg = None
                 obs[tk].append(dict(d=str(idx[t].date()), s=b["score"], c=(c1/c0-1)*100, o=(c1/o1-1)*100,
+                                    fg=_fg,
                                     vr=(float(pvr) if pvr == pvr else 1.0), cond=dict(risk["cond"]),
                                     o2=((c2v/o1-1)*100 if c2v is not None else None),
                                     ma200=bool(c0 > pma) if pma == pma else False,
@@ -1633,6 +1636,25 @@ def run_backtest():
                 d_pnl = (_h_pnl(_sc) - base_pnl) * f365
                 R["ablation"][anm] = round(d_pnl, 2)
                 rep.append(f"    -{anm:12s} {d_pnl:+8.2f}/yr")
+            # ─ F&G 구간별 다음날 실제 움직임 (참고지표 검증) + 최근 30일 ─
+            FGB = [(0,25,"극단적공포"),(26,45,"공포"),(46,55,"중립"),(56,75,"탐욕"),(76,100,"극단적탐욕")]
+            R["fear_greed"] = {}; fgrows = [r for r in rows if r.get("fg") is not None]
+            if fgrows:
+                rep.append("  ─ F&G 구간별 다음날 C2C (참고지표) ─")
+                for lo, hi, nm in FGB:
+                    sub = [r for r in fgrows if lo <= r["fg"] <= hi]
+                    if not sub: continue
+                    up = sum(1 for r in sub if r["c"] > 0)
+                    avg = sum(r["c"] for r in sub)/len(sub)
+                    ci = _wilson(up, len(sub))
+                    R["fear_greed"][nm] = dict(n=len(sub), up_rate=round(up/len(sub)*100,1), ci=list(ci), avg_c2c=round(avg,3))
+                    rep.append(f"    {nm:8s} n={len(sub):3d} 다음날상승 {up/len(sub)*100:5.1f}% CI({ci[0]}~{ci[1]}) 평균 {avg:+.3f}%")
+                last30 = fgrows[-30:]
+                up30 = sum(1 for r in last30 if r["c"] > 0)
+                R["fg_recent30"] = [dict(d=r["d"], fg=r["fg"], c=round(r["c"],2)) for r in last30]
+                R["fg_recent30_summary"] = dict(n=len(last30), up=up30, avg_fg=round(sum(r["fg"] for r in last30)/len(last30),1),
+                                                avg_c2c=round(sum(r["c"] for r in last30)/len(last30),3))
+                rep.append(f"    최근30일 평균F&G {R['fg_recent30_summary']['avg_fg']} · 상승일 {up30}/{len(last30)} · 평균 {R['fg_recent30_summary']['avg_c2c']:+.3f}%")
             # ─ 반반 검증 (walk-forward): 전반 vs 후반 각각 H 성적 ─
             R["walkforward"] = {}
             rep.append("  ─ 반반 검증 (H · 비용반영) ─")
