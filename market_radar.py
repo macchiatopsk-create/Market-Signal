@@ -1509,8 +1509,10 @@ def run_backtest():
                 pvr = pre[tk]["vr"].iloc[t]
                 try: _fg = compute_fear_greed(risk, inst, macro)["score"]
                 except Exception: _fg = None
+                h1 = float(df["High"].iloc[t+1]); l1 = float(df["Low"].iloc[t+1])
+                _mfe = (h1/o1 - 1) * 100; _mae = (l1/o1 - 1) * 100
                 obs[tk].append(dict(d=str(idx[t].date()), s=b["score"], c=(c1/c0-1)*100, o=(c1/o1-1)*100,
-                                    fg=_fg,
+                                    fg=_fg, mfe=_mfe, mae=_mae,
                                     vr=(float(pvr) if pvr == pvr else 1.0), cond=dict(risk["cond"]),
                                     o2=((c2v/o1-1)*100 if c2v is not None else None),
                                     ma200=bool(c0 > pma) if pma == pma else False,
@@ -1636,6 +1638,30 @@ def run_backtest():
                 d_pnl = (_h_pnl(_sc) - base_pnl) * f365
                 R["ablation"][anm] = round(d_pnl, 2)
                 rep.append(f"    -{anm:12s} {d_pnl:+8.2f}/yr")
+            # ─ 0DTE 관점: 시가→종가 하루 보유 (방향+크기+장중 폭) ─
+            R["intraday"] = {}
+            rep.append("  ─ 0DTE 관점 (시가 진입→종가 청산 · 장중 MFE/MAE) ─")
+            import statistics as _st
+            for lo, hi, nm in BIAS_BUCKETS:
+                sub = [r for r in rows if lo <= r["s"] <= hi and r.get("mfe") is not None]
+                if len(sub) < 5: continue
+                bear = lo >= 56
+                dirok = sum(1 for r in sub if (r["o"] < 0) == bear) / len(sub) * 100
+                o2c = [r["o"] for r in sub]
+                # 롱 관점 유리/불리 폭 (약세구간은 부호 반전해 '방향 맞췄을 때' 기준)
+                sign = -1 if bear else 1
+                fav = [sign * r["mfe"] if sign > 0 else -sign * r["mae"] * -1 for r in sub]
+                fav = [(r["mfe"] if not bear else -r["mae"]) for r in sub]
+                adv = [(-r["mae"] if not bear else r["mfe"]) for r in sub]
+                big3 = sum(1 for x in o2c if abs(x) >= 0.3) / len(sub) * 100
+                big5 = sum(1 for x in o2c if abs(x) >= 0.5) / len(sub) * 100
+                big8 = sum(1 for x in o2c if abs(x) >= 0.8) / len(sub) * 100
+                R["intraday"][nm] = dict(n=len(sub), dir_ok=round(dirok,1),
+                                         med_o2c=round(_st.median(o2c),3), avg_o2c=round(sum(o2c)/len(sub),3),
+                                         med_fav=round(_st.median(fav),3), med_adv=round(_st.median(adv),3),
+                                         pct_03=round(big3,1), pct_05=round(big5,1), pct_08=round(big8,1))
+                rep.append(f"    {nm:12s} n={len(sub):3d} 방향적중 {dirok:5.1f}% 중앙O2C {_st.median(o2c):+.3f}% "
+                           f"유리폭 {_st.median(fav):+.3f}% 역행폭 {_st.median(adv):+.3f}% |0.3%↑ {big3:.0f}% 0.5%↑ {big5:.0f}% 0.8%↑ {big8:.0f}%")
             # ─ F&G 구간별 다음날 실제 움직임 (참고지표 검증) + 최근 30일 ─
             FGB = [(0,25,"극단적공포"),(26,45,"공포"),(46,55,"중립"),(56,75,"탐욕"),(76,100,"극단적탐욕")]
             R["fear_greed"] = {}; fgrows = [r for r in rows if r.get("fg") is not None]
