@@ -1662,6 +1662,35 @@ def run_backtest():
                                          pct_03=round(big3,1), pct_05=round(big5,1), pct_08=round(big8,1))
                 rep.append(f"    {nm:12s} n={len(sub):3d} 방향적중 {dirok:5.1f}% 중앙O2C {_st.median(o2c):+.3f}% "
                            f"유리폭 {_st.median(fav):+.3f}% 역행폭 {_st.median(adv):+.3f}% |0.3%↑ {big3:.0f}% 0.5%↑ {big5:.0f}% 0.8%↑ {big8:.0f}%")
+            # ─ 점수 ↔ 실제 움직임 상관관계 (스피어만 순위상관) ─
+            def _spearman(xs, ys):
+                n = len(xs)
+                if n < 10: return None
+                def rank(v):
+                    order = sorted(range(n), key=lambda i: v[i]); rk = [0.0]*n; i = 0
+                    while i < n:
+                        j = i
+                        while j+1 < n and v[order[j+1]] == v[order[i]]: j += 1
+                        avg = (i+j)/2.0 + 1
+                        for k in range(i, j+1): rk[order[k]] = avg
+                        i = j+1
+                    return rk
+                rx, ry = rank(xs), rank(ys)
+                mx, my = sum(rx)/n, sum(ry)/n
+                num = sum((a-mx)*(b-my) for a, b in zip(rx, ry))
+                den = (sum((a-mx)**2 for a in rx) * sum((b-my)**2 for b in ry)) ** 0.5
+                return round(num/den, 3) if den else None
+            sc = [r["s"] for r in rows]
+            mag = [abs(r["o"]) for r in rows]              # 장중 움직임 크기
+            rng = [(r["mfe"] - r["mae"]) for r in rows]    # 장중 전체 레인지
+            dirn = [r["o"] for r in rows]                  # 부호 = 방향
+            R["correlation"] = dict(score_vs_magnitude=_spearman(sc, mag),
+                                    score_vs_range=_spearman(sc, rng),
+                                    score_vs_direction=_spearman(sc, dirn), n=len(rows))
+            rep.append("  ─ 점수↔움직임 상관 (스피어만) ─")
+            rep.append(f"    점수 vs 움직임크기 {R['correlation']['score_vs_magnitude']} · "
+                       f"점수 vs 장중레인지 {R['correlation']['score_vs_range']} · "
+                       f"점수 vs 방향 {R['correlation']['score_vs_direction']} (n={len(rows)})")
             # ─ F&G 구간별 다음날 실제 움직임 (참고지표 검증) + 최근 30일 ─
             FGB = [(0,25,"극단적공포"),(26,45,"공포"),(46,55,"중립"),(56,75,"탐욕"),(76,100,"극단적탐욕")]
             R["fear_greed"] = {}; fgrows = [r for r in rows if r.get("fg") is not None]
