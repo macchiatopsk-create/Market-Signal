@@ -4,11 +4,6 @@ on:
     - cron: "0 21 * * 1-5"     # 평일 21:00 UTC (미 장마감 근처)
     - cron: "30 22 * * 1-5"    # 데이터 늦게 뜰 때 보정
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "palevie/**"
-      - ".github/workflows/radar.yml"
 
 permissions:
   contents: write              # history 커밋백 위해 read→write
@@ -57,8 +52,6 @@ jobs:
           cp icon-192.png _site/ 2>/dev/null || true
           cp icon-512.png _site/ 2>/dev/null || true
           cp icon-180.png _site/ 2>/dev/null || true
-          mkdir -p _site/palevie
-          cp palevie/index.html _site/palevie/index.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
