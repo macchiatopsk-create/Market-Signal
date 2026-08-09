@@ -52,6 +52,8 @@ jobs:
           cp icon-192.png _site/ 2>/dev/null || true
           cp icon-512.png _site/ 2>/dev/null || true
           cp icon-180.png _site/ 2>/dev/null || true
+          mkdir -p _site/palevie
+          cp palevie/index.html _site/palevie/index.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
