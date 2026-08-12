@@ -20,6 +20,7 @@ import requests
 try:
     import yfinance as yf
     import pandas as pd
+    import numpy as np
 except ImportError:
     print("필요: pip install yfinance requests pandas"); sys.exit(1)
 
@@ -1866,7 +1867,8 @@ def today_0dte_signal(tk):
     tp = (o["High"] + o["Low"] + o["Close"]) / 3
     vw = float((tp * o["Volume"]).sum() / max(o["Volume"].sum(), 1))
     gap = (float(day["Open"].iloc[0]) / float(prev["Close"].iloc[-1]) - 1) * 100
-    i10 = df.index.get_loc(day.index[5])
+    mask = df.index.date == d
+    i10 = int(np.flatnonzero(mask)[5]) if hasattr(np, "flatnonzero") else list(mask).index(True) + 5
     hist_cl = [float(x) for x in df["Close"].iloc[max(0, i10-60):i10+1]]
     e9 = _ema(hist_cl, 9)[-1]; e21 = _ema(hist_cl, 21)[-1]; rsi = _rsi(hist_cl, 14)[-1]
     s = 0
@@ -2380,8 +2382,16 @@ def main():
             errors["backtest"] = str(ex)
 
     for _tk, _mk, _d in (("SPY","sp",spd), ("QQQ","nq",nqd)):
-        try: _d["dte_today"] = today_0dte_signal(_tk)
-        except Exception: _d["dte_today"] = None
+        try:
+            _d["dte_today"] = today_0dte_signal(_tk)
+            if _d["dte_today"] is None:
+                errors[f"dte_{_tk}"] = "조건미달(데이터 부족/장중 봉 없음)"
+                print(f"  0DTE {_tk}: 신호 없음 (조건미달)")
+            else:
+                print(f"  0DTE {_tk}: 점수 {_d['dte_today']['score']}")
+        except Exception as _ex:
+            _d["dte_today"] = None; errors[f"dte_{_tk}"] = f"{type(_ex).__name__}: {_ex}"
+            print(f"  0DTE {_tk} 실패: {type(_ex).__name__}: {_ex}")
     dte_txt = ""; dte_data = {}
     if os.environ.get("DTE", "1") != "0":
         try:
