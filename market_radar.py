@@ -2106,6 +2106,91 @@ def run_v2_backtest():
         out[tk]=rows
     return out
 
+def run_v3_backtest():
+    """v3: VWAP 밴드 진입 → N봉 내 중간선(VWAP) 미도달 시 즉시 손절.
+       빠른 반응만 먹는 구조 → 세타 노출 최소화."""
+    out = {}
+    for tk in ("SPY", "QQQ"):
+        df = yf.Ticker(tk).history(period="60d", interval="5m")
+        if df is None or df.empty: continue
+        df = df[["Open","High","Low","Close","Volume"]].dropna()
+        try: df.index = df.index.tz_convert("America/New_York")
+        except Exception: pass
+        df = df[(df.index.time >= dt.time(9,30)) & (df.index.time < dt.time(16,0))]
+        days = sorted(set(df.index.date)); trades = []; prev_close = None
+        for d in days:
+            day = df[df.index.date == d]
+            if len(day) < 60:
+                if len(day): prev_close = float(day["Close"].iloc[-1])
+                continue
+            O=[float(x) for x in day["Open"]]; H=[float(x) for x in day["High"]]
+            L=[float(x) for x in day["Low"]]; C=[float(x) for x in day["Close"]]; V=[float(x) for x in day["Volume"]]
+            n=len(C); k10=5
+            cpv=cv=cpv2=0.0; vw=[]; sd=[]
+            for i in range(n):
+                tp=(H[i]+L[i]+C[i])/3; cpv+=tp*V[i]; cv+=V[i]; cpv2+=tp*tp*V[i]
+                w=cpv/cv if cv else tp
+                var=max(cpv2/cv-w*w,0.0) if cv else 0.0
+                vw.append(w); sd.append(var**0.5)
+            gap=(O[0]/prev_close-1)*100 if prev_close else 0.0
+            i10=list(df.index).index(day.index[k10])
+            hist=[float(x) for x in df["Close"].iloc[max(0,i10-60):i10+1]]
+            def _e(v,p):
+                kk=2/(p+1); e=None
+                for x in v: e=x if e is None else x*kk+e*(1-kk)
+                return e
+            e9,e21=_e(hist,9),_e(hist,21)
+            up = 1 if e9>e21 else -1
+            ddir = up if ((up>0 and gap>0) or (up<0 and gap<0)) else 0
+            if ddir!=0:
+                for i in range(k10+1, n-1):
+                    dev=(C[i]-vw[i])/sd[i] if sd[i]>1e-9 else 0.0
+                    if ddir>0 and dev>-1.0: continue
+                    if ddir<0 and dev<1.0: continue
+                    ep=C[i]; bw=(2*sd[i]/vw[i]*100) if vw[i] else 0
+                    for NB in (2,3,4,6):
+                        hit=None; mv=0.0
+                        for j in range(i+1, min(i+1+NB, n)):
+                            if ddir>0 and H[j]>=vw[j]: hit=(vw[j]/ep-1)*100; break
+                            if ddir<0 and L[j]<=vw[j]: hit=(ep/vw[j]-1)*100; break
+                        if hit is None:
+                            j=min(i+NB, n-1)
+                            mv=((C[j]/ep-1)*100) if ddir>0 else ((ep/C[j]-1)*100)
+                        trades.append(dict(d=str(d), nb=NB, bw=round(bw,3), dir=ddir,
+                                           hit=(hit is not None), pnl=round(hit if hit is not None else mv,4),
+                                           mins=NB*5))
+                    # 같은 자리 중복 방지: 4봉 건너뜀
+            prev_close=C[-1]
+        out[tk]=trades
+    return out
+
+def analyze_v3(res):
+    rep=[]; data={}
+    for tk, trades in res.items():
+        if not trades: continue
+        R={}
+        rep.append(f"\n[{tk}] v3 (밴드 진입 → N봉 내 VWAP 미도달 시 컷)")
+        bws=sorted(set(t["bw"] for t in trades))
+        cut = sorted(t["bw"] for t in trades)[2*len(trades)//3] if trades else 0
+        for NB in (2,3,4,6):
+            for scope, sel in (("전체", lambda t: True), (f"밴드폭≥{cut:.2f}%", lambda t: t["bw"]>=cut)):
+                ss=[t for t in trades if t["nb"]==NB and sel(t)]
+                if len(ss)<20: continue
+                hits=sum(1 for t in ss if t["hit"])
+                wins=sum(1 for t in ss if t["pnl"]>0)
+                ci=_wilson(wins,len(ss))
+                avg=sum(t["pnl"] for t in ss)/len(ss)
+                avgw=sum(t["pnl"] for t in ss if t["pnl"]>0)/max(wins,1)
+                lose=[t["pnl"] for t in ss if t["pnl"]<=0]
+                avgl=sum(lose)/max(len(lose),1)
+                R[f"{NB}봉|{scope}"]=dict(n=len(ss), hit=round(hits/len(ss)*100,1), win=round(wins/len(ss)*100,1),
+                                          ci=list(ci), avg=round(avg,4), avg_win=round(avgw,4), avg_loss=round(avgl,4))
+                rep.append(f"  {NB}봉({NB*5}분) {scope:12s} n={len(ss):4d} 도달 {hits/len(ss)*100:5.1f}% "
+                           f"승률 {wins/len(ss)*100:5.1f}% CI({ci[0]}~{ci[1]}) 평균 {avg:+.4f}% "
+                           f"(승 {avgw:+.3f}% / 패 {avgl:+.3f}%)")
+        data[tk]=R
+    return "\n".join(rep), data
+
 def analyze_v2(res):
     rep=[]; data={}
     for tk, rows in res.items():
@@ -2696,6 +2781,14 @@ def main():
             print("  VWAP 완료")
         except Exception as _ex:
             errors["vwap"] = f"{type(_ex).__name__}: {_ex}"; print(f"  VWAP 실패: {_ex}")
+    v3_txt = ""; v3_data = {}
+    if os.environ.get("V3", "1") != "0":
+        try:
+            print("  v3 백테스트 (짧은 홀드)...", flush=True)
+            v3_txt, v3_data = analyze_v3(run_v3_backtest())
+            print("  v3 완료")
+        except Exception as _ex:
+            errors["v3"] = f"{type(_ex).__name__}: {_ex}"; print(f"  v3 실패: {_ex}")
     v2_txt = ""; v2_data = {}
     if os.environ.get("V2", "1") != "0":
         try:
@@ -2723,6 +2816,7 @@ def main():
                    "vwap": {"at": dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET"),
                             "report": vw_txt, "data": vw_data},
                    "v2": {"report": v2_txt, "data": v2_data},
+                   "v3": {"report": v3_txt, "data": v3_data},
                    "errors": {k: str(v)[:300] for k, v in (errors or {}).items()}},
                   f, ensure_ascii=False, indent=1)
 
