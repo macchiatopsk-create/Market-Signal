@@ -1840,7 +1840,10 @@ def run_0dte_backtest():
             vol_hist.append(v10)
             fwd = (close / px10 - 1) * 100        # 10시→종가 수익률 (%)
             hi = float(after["High"].max()); lo = float(after["Low"].min())
-            rows.append(dict(d=str(d), px10=px10, fwd=fwd,
+            day_rng = (float(day["High"].max()) / float(day["Low"].min()) - 1) * 100
+            prior = [x["day_rng"] for x in rows][-10:]
+            regime = (sum(prior)/len(prior)) if len(prior) >= 5 else None
+            rows.append(dict(d=str(d), px10=px10, fwd=fwd, day_rng=day_rng, regime=regime,
                              vwap_pos=(px10 / vw - 1) * 100,
                              or_break=(1 if px10 > or_h else -1 if px10 < or_l else 0),
                              or_w=(or_h / or_l - 1) * 100,
@@ -1918,6 +1921,23 @@ def analyze_0dte(res):
             R["dte_score"][nm] = dict(n=len(sub), up=round(wr,1), ci=list(ci), avg=round(avg,3),
                                       mfe=round(mfe,3), mae=round(mae,3))
             rep.append(f"      {nm:14s} n={len(sub):3d} 상승 {wr:5.1f}% CI({ci[0]}~{ci[1]}) 평균 {avg:+.3f}% MFE {mfe:+.2f}% MAE {mae:+.2f}%")
+        # ─ 레짐별 (전일까지 10일 평균 일중레인지 기준) ─
+        rg_rows = [r for r in rows if r.get("regime") is not None]
+        if len(rg_rows) >= 20:
+            med = sorted(r["regime"] for r in rg_rows)[len(rg_rows)//2]
+            rep.append(f"    ─ 레짐별 (기준: 최근10일 평균레인지 중앙값 {med:.2f}%) ─")
+            R["regime_split"] = {"median": round(med,3)}
+            for nm, fn in (("고변동 레짐", lambda r: r["regime"] >= med), ("저변동 레짐", lambda r: r["regime"] < med)):
+                sub = [r for r in rg_rows if fn(r)]
+                hi = [r for r in sub if dscore(r) >= 3]; lo_ = [r for r in sub if dscore(r) <= -3]
+                def _wr(g): 
+                    return (round(sum(1 for r in g if r["fwd"] > 0)/len(g)*100,1), _wilson(sum(1 for r in g if r["fwd"] > 0), len(g))) if g else (None, (None,None))
+                hw, hci = _wr(hi); lw, lci = _wr(lo_)
+                avg_mv = sum(abs(r["fwd"]) for r in sub)/len(sub) if sub else 0
+                R["regime_split"][nm] = dict(n=len(sub), avg_move=round(avg_mv,3),
+                                             strong_long=dict(n=len(hi), up=hw, ci=list(hci)),
+                                             strong_short=dict(n=len(lo_), up=lw, ci=list(lci)))
+                rep.append(f"      {nm} n={len(sub):3d} 평균움직임 {avg_mv:.3f}% | 강한롱 {len(hi)}건 {hw}% CI({hci[0]}~{hci[1]}) · 강한숏 {len(lo_)}건 {lw}% CI({lci[0]}~{lci[1]})")
         # ─ 월별 분해 (레짐 변화 확인) ─
         rep.append("    ─ 월별 분해 (레짐 체크) ─")
         R["monthly"] = {}
