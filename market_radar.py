@@ -1662,6 +1662,30 @@ def run_backtest():
                                          pct_03=round(big3,1), pct_05=round(big5,1), pct_08=round(big8,1))
                 rep.append(f"    {nm:12s} n={len(sub):3d} 방향적중 {dirok:5.1f}% 중앙O2C {_st.median(o2c):+.3f}% "
                            f"유리폭 {_st.median(fav):+.3f}% 역행폭 {_st.median(adv):+.3f}% |0.3%↑ {big3:.0f}% 0.5%↑ {big5:.0f}% 0.8%↑ {big8:.0f}%")
+            # ─ 0DTE 스트래들 룰 (별도 실험 · 기존 H와 무관) ─
+            #   전날 종가 신호 → 다음날 시가 콜+풋 동시매수 → 장중 청산.
+            #   손익 근사: 최대 편도 이동폭(=|MFE| 또는 |MAE| 중 큰 값) - 프리미엄.
+            #   프리미엄은 실제 호가가 없어 가정치(스팟 대비 %)로 스윕한다.
+            R["straddle"] = {}
+            rep.append("  ─ 0DTE 스트래들 (시가 진입 · 콜+풋 · 프리미엄 가정별 도달률) ─")
+            for lo, hi, nm in BIAS_BUCKETS:
+                sub = [r for r in rows if lo <= r["s"] <= hi and r.get("mfe") is not None]
+                if len(sub) < 10: continue
+                # 최대 편도 이동 (장중 최적 청산 기준) / 종가 보유 기준
+                best = [max(abs(r["mfe"]), abs(r["mae"])) for r in sub]
+                atc  = [abs(r["o"]) for r in sub]
+                cell = dict(n=len(sub))
+                for prem in (0.3, 0.5, 0.7):
+                    hit_best = sum(1 for x in best if x >= prem) / len(sub) * 100
+                    hit_close = sum(1 for x in atc if x >= prem) / len(sub) * 100
+                    edge = sum(x - prem for x in best) / len(sub)
+                    cell[f"p{int(prem*10)}"] = dict(best=round(hit_best,1), close=round(hit_close,1), edge=round(edge,3))
+                import statistics as _sx
+                cell["med_best"] = round(_sx.median(best), 3)
+                cell["med_close"] = round(_sx.median(atc), 3)
+                R["straddle"][nm] = cell
+                rep.append(f"    {nm:12s} n={len(sub):3d} 최대편도중앙 {cell['med_best']:.3f}% 종가중앙 {cell['med_close']:.3f}% | "
+                           + " ".join(f"{p}%프리:{cell[f'p{int(p*10)}']['best']:.0f}/{cell[f'p{int(p*10)}']['close']:.0f}" for p in (0.3,0.5,0.7)))
             # ─ 점수 ↔ 실제 움직임 상관관계 (스피어만 순위상관) ─
             def _spearman(xs, ys):
                 n = len(xs)
