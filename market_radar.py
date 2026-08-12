@@ -2214,16 +2214,17 @@ def run_v4_backtest():
                             side=1; entered=True
                     if not entered: i+=1; continue
                     ep=C[i]; res=None
+                    stop_lv = max(H[i-1], H[i]) if side<0 else min(L[i-1], L[i])   # 타이트 손절선
                     for j in range(i+1, n):
                         hold=(j-i)*5
                         tgt=vwap[j]
                         if side<0:
                             if L[j]<=tgt: res=("TARGET",(ep/tgt-1)*100,hold); break
-                            if H[j]>=vwap[j]+2*sd[j]: res=("STOP",(ep/(vwap[j]+2*sd[j])-1)*100,hold); break
+                            if H[j]>=stop_lv: res=("STOP",(ep/stop_lv-1)*100,hold); break
                         else:
                             if H[j]>=tgt: res=("TARGET",(tgt/ep-1)*100,hold); break
-                            if L[j]<=vwap[j]-2*sd[j]: res=("STOP",((vwap[j]-2*sd[j])/ep-1)*100,hold); break
-                        if hold>=60:
+                            if L[j]<=stop_lv: res=("STOP",(stop_lv/ep-1)*100,hold); break
+                        if hold>=30:
                             p=(ep/C[j]-1)*100 if side<0 else (C[j]/ep-1)*100
                             res=("TIMEOUT",p,hold); break
                     if res is None:
