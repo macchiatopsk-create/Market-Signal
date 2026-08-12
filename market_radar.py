@@ -773,6 +773,7 @@ def grade_and_record(hist, today, pred):
             mk + "_cta_score": d["cta_score"], mk + "_cta_tier": d["cta_tier"], mk + "_final": d["final"],
             mk + "_conviction": d.get("conviction"), mk + "_dwinner": d.get("dwinner"),
             mk + "_ma200": d.get("ma200", True), mk + "_fg": d.get("fg"),
+            mk + "_dte": d.get("dte"),
             mk + "_close": d["close"], mk + "_open": d["open"], mk + "_high": d["high"], mk + "_low": d["low"],
             mk + "_atr": d["atr"],
             mk + "_next_hit": None, mk + "_dir_hit": None, mk + "_r": None,
@@ -1151,6 +1152,8 @@ def signal_tab(name, d, buckets):
       </div>
       <div class="sig-meta">위험 {risk['tier']} {risk['score']} · 기관 {inst['tier']} · {inst['cta']['tier']} · 종가 {risk['close']} ({risk['change']:+.1f}%)</div>
     </div>
+    <div class="risk-card"><div class="rc-head" style="color:#dba642">0DTE 장중 실험 · {d['ticker']}</div>
+      <div id="dte-{d['ticker']}"><div class="tp-sub">장중에만 표시 (10:00 ET 이후)</div></div></div>
     {fg_gauge(d)}
     {debate_card(d['debate'])}
     <div class="tradeplan" id="tp-{d['ticker']}">
@@ -1233,6 +1236,36 @@ function nyParts(ts){
   const o = {}; NYFMT.formatToParts(new Date(ts*1000)).forEach(p => o[p.type]=p.value);
   let h = parseInt(o.hour,10); if (h===24) h=0;
   return {date:o.year+"-"+o.month+"-"+o.day, min:h*60+parseInt(o.minute,10)};
+}
+function dteSignal(bars, s, b){
+  // 10:00 ET 이후에만 유효 (OR 6봉 확정 후)
+  const reg = bars.filter(x => x.session !== "pre" && x.session !== "post");
+  const dates = [...new Set(reg.map(x => x.date))];
+  const today = dates[dates.length-1];
+  const day = reg.filter(x => x.date === today);
+  if (day.length < 7) return null;
+  const o = day.slice(0,6);
+  const orH = Math.max(...o.map(x=>x.h)), orL = Math.min(...o.map(x=>x.l));
+  let pv=0, vv=0;
+  o.forEach(x => { const tp=(x.h+x.l+x.c)/3; pv += tp*(x.v||0); vv += (x.v||0); });
+  const vwap = vv ? pv/vv : day[5].c;
+  const px = day[day.length-1].c;
+  const gap = (b.prevClose!=null) ? (day[0].o/b.prevClose - 1)*100 : 0;
+  // EMA/RSI (최근 60봉 종가)
+  const cl = reg.slice(-61).map(x=>x.c);
+  const ema=(n)=>{const k=2/(n+1);let e=null;cl.forEach(v=>e = e===null?v:v*k+e*(1-k));return e;};
+  const e9=ema(9), e21=ema(21);
+  let g=0,l=0; for(let i=cl.length-14;i<cl.length;i++){const d2=cl[i]-cl[i-1]; if(d2>0)g+=d2; else l-=d2;}
+  const rsi = l===0?100:100-100/(1+(g/14)/(l/14));
+  let sc=0;
+  sc += gap>=0.3?1:(gap<=-0.3?-1:0);
+  sc += e9>e21?1:-1;
+  sc += px>vwap?1:-1;
+  sc += rsi>60?1:(rsi<40?-1:0);
+  const lab = sc>=3?"CALL 우세":sc<=-3?"PUT 우세":"관망";
+  const col = sc>=3?"#34c77b":sc<=-3?"#e95656":"#6d7a8c";
+  return {score:sc, label:lab, color:col, gap, vwap, rsi, ema:(e9>e21?1:-1), orH, orL, px,
+          ready:(s && s.nowMin>=600)};
 }
 function isRegularSession(){
   const d = new Date();
@@ -1405,10 +1438,27 @@ async function updateTradePlan(ticker){
   const body = box.querySelector(".tp-body");
   let res = await fetchChart(ticker);
   if (!res){ await new Promise(r => setTimeout(r, 1500)); res = await fetchChart(ticker); }  // 1회 재시도
+  if (!res) res = {bars: []};
   const s = res ? buildSession(res) : null;
   if (!s){ body.innerHTML = '<div class="tp-note">Intraday data unavailable. Use EOD bias only.</div>'; return; }
   const p = computePlan(ticker, s);
   body.innerHTML = renderPlan(p);
+  const dte = dteSignal(res.bars || [], s, b);
+  const dteEl = document.getElementById("dte-"+ticker);
+  if (dteEl && dte){
+    if (!dte.ready){
+      dteEl.innerHTML = '<div class="tp-sub">0DTE — 10:00 ET 이후 산출 (오프닝 레인지 확정 대기)</div>';
+    } else {
+      dteEl.innerHTML =
+        '<div class="tp-row"><span>0DTE 신호</span><span class="tp-v" style="color:'+dte.color+'">'+dte.label+' ('+(dte.score>0?"+":"")+dte.score+')</span></div>'+
+        '<div class="tp-row"><span>갭</span><span class="tp-v">'+dte.gap.toFixed(2)+'%</span></div>'+
+        '<div class="tp-row"><span>VWAP</span><span class="tp-v">'+dte.vwap.toFixed(2)+' ('+(dte.px>dte.vwap?"위":"아래")+')</span></div>'+
+        '<div class="tp-row"><span>EMA9/21</span><span class="tp-v">'+(dte.ema>0?"정배열":"역배열")+'</span></div>'+
+        '<div class="tp-row"><span>RSI(14)</span><span class="tp-v">'+dte.rsi.toFixed(0)+'</span></div>'+
+        '<div class="tp-row"><span>OR</span><span class="tp-v">'+dte.orL.toFixed(2)+' ~ '+dte.orH.toFixed(2)+'</span></div>'+
+        '<div class="tp-foot">실험 단계 · 표본 부족(60일) · 검증 전 참고용</div>';
+    }
+  }
   box.style.borderLeftColor = statusColor(p.status);
   if (isRegularSession() && (p.status.indexOf("ACTIVE")>=0 || p.status.indexOf("CHASE")>=0)) notifyLocal(ticker, p.status);
 }
@@ -1797,6 +1847,38 @@ def _rsi(vals, n=14):
             ag = sum(gains[-n:]) / n; al = sum(losses[-n:]) / n
             out[i] = 100.0 if al == 0 else 100 - 100 / (1 + ag / al)
     return out
+
+def today_0dte_signal(tk):
+    """당일 10:00 시점 기준 0DTE 신호를 사후 계산 (EOD 실행 시 축적용)."""
+    df = yf.Ticker(tk).history(period="5d", interval="5m")
+    if df is None or df.empty: return None
+    df = df[["Open","High","Low","Close","Volume"]].dropna()
+    try: df.index = df.index.tz_convert("America/New_York")
+    except Exception: pass
+    df = df[(df.index.time >= dt.time(9,30)) & (df.index.time < dt.time(16,0))]
+    days = sorted(set(df.index.date))
+    if len(days) < 2: return None
+    d = days[-1]; day = df[df.index.date == d]
+    prev = df[df.index.date == days[-2]]
+    if len(day) < 7 or len(prev) < 10: return None
+    o = day.iloc[:6]; after = day.iloc[6:]
+    px10 = float(after["Open"].iloc[0]); close = float(day["Close"].iloc[-1])
+    tp = (o["High"] + o["Low"] + o["Close"]) / 3
+    vw = float((tp * o["Volume"]).sum() / max(o["Volume"].sum(), 1))
+    gap = (float(day["Open"].iloc[0]) / float(prev["Close"].iloc[-1]) - 1) * 100
+    i10 = df.index.get_loc(day.index[5])
+    hist_cl = [float(x) for x in df["Close"].iloc[max(0, i10-60):i10+1]]
+    e9 = _ema(hist_cl, 9)[-1]; e21 = _ema(hist_cl, 21)[-1]; rsi = _rsi(hist_cl, 14)[-1]
+    s = 0
+    s += 1 if gap >= 0.3 else (-1 if gap <= -0.3 else 0)
+    s += 1 if e9 > e21 else -1
+    s += 1 if px10 > vw else -1
+    if rsi is not None: s += 1 if rsi > 60 else (-1 if rsi < 40 else 0)
+    rng10 = [(float(df[df.index.date==x]["High"].max())/float(df[df.index.date==x]["Low"].min())-1)*100 for x in days[:-1]]
+    return dict(score=s, gap=round(gap,3), vwap_pos=round((px10/vw-1)*100,3),
+                ema=(1 if e9 > e21 else -1), rsi=(round(rsi,1) if rsi is not None else None),
+                px10=round(px10,2), fwd=round((close/px10-1)*100,3),
+                regime=(round(sum(rng10[-10:])/len(rng10[-10:]),3) if rng10 else None))
 
 def run_0dte_backtest():
     """yfinance 5분봉 60일로 장중 방향 예측력 실측 (표본 = 거래일수 × 2티커)."""
@@ -2280,6 +2362,7 @@ def main():
                     cta_score=inst["cta"]["score"], cta_tier=inst["cta"]["tier"], final=d["fsig"],
                     conviction=d["debate"]["conviction"], dwinner=d["debate"]["winner"],
                     ma200=risk.get("above_ma200", True), fg=d.get("fg", {}).get("score"),
+                    dte=d.get("dte_today"),
                     close=risk["close"], open=risk["open"], high=risk["high"], low=risk["low"], atr=risk["atr"])
     pred = {"sp": _pred(spd, sp, sp_risk, inst_sp), "nq": _pred(nqd, nq, nq_risk, inst_nq)}
 
@@ -2296,6 +2379,9 @@ def main():
         except Exception as ex:
             errors["backtest"] = str(ex)
 
+    for _tk, _mk, _d in (("SPY","sp",spd), ("QQQ","nq",nqd)):
+        try: _d["dte_today"] = today_0dte_signal(_tk)
+        except Exception: _d["dte_today"] = None
     dte_txt = ""; dte_data = {}
     if os.environ.get("DTE", "1") != "0":
         try:
