@@ -1940,6 +1940,126 @@ def run_0dte_backtest():
         res[tk] = rows
     return res
 
+def run_vwap_backtest():
+    """VWAP 밴드 스캘핑 — 방향(EMA/RSI/갭/볼륨) + 진입(VWAP밴드) + 익절/손절.
+       하루 여러 번 진입 가능 → 표본이 거래일수가 아니라 트레이드 수."""
+    import math
+    out = {}
+    for tk in ("SPY", "QQQ"):
+        df = yf.Ticker(tk).history(period="60d", interval="5m")
+        if df is None or df.empty: continue
+        df = df[["Open","High","Low","Close","Volume"]].dropna()
+        try: df.index = df.index.tz_convert("America/New_York")
+        except Exception: pass
+        df = df[(df.index.time >= dt.time(9,30)) & (df.index.time < dt.time(16,0))]
+        days = sorted(set(df.index.date))
+        trades = []; prev_close = None
+        for d in days:
+            day = df[df.index.date == d]
+            if len(day) < 60:
+                if len(day): prev_close = float(day["Close"].iloc[-1])
+                continue
+            O = [float(x) for x in day["Open"]]; H = [float(x) for x in day["High"]]
+            L = [float(x) for x in day["Low"]]; C = [float(x) for x in day["Close"]]
+            V = [float(x) for x in day["Volume"]]
+            n = len(C)
+            # 누적 VWAP + 표준편차 밴드
+            cpv = cv = cpv2 = 0.0; vwap = []; sd = []
+            for i in range(n):
+                tp = (H[i]+L[i]+C[i])/3
+                cpv += tp*V[i]; cv += V[i]; cpv2 += tp*tp*V[i]
+                w = cpv/cv if cv else tp
+                var = max(cpv2/cv - w*w, 0.0) if cv else 0.0
+                vwap.append(w); sd.append(math.sqrt(var))
+            # 10:00 시점(6봉) 방향 판단
+            gap = (O[0]/prev_close - 1)*100 if prev_close else 0.0
+            k10 = 5
+            hist = C[:k10+1]
+            def _e(vals, p):
+                kk = 2/(p+1); e = None
+                for v in vals: e = v if e is None else v*kk+e*(1-kk)
+                return e
+            idx10 = list(df.index).index(day.index[k10])
+            long_hist = [float(x) for x in df["Close"].iloc[max(0, idx10-60):idx10+1]]
+            e9 = _e(long_hist, 9); e21 = _e(long_hist, 21); rs = _rsi(long_hist, 14)[-1]
+            up = 1 if e9 > e21 else -1
+            rsi_ok_l = (rs is not None and rs > 55); rsi_ok_s = (rs is not None and rs < 45)
+            v20 = sum(V[:k10+1])/(k10+1)
+            for entry_rule in ("EMA", "EMA+RSI", "EMA+GAP", "EMA+RSI+GAP", "EMA+VOL"):
+                pass
+            # 방향 확정 (여러 조합을 각각 기록)
+            dirs = {
+                "EMA":        up,
+                "EMA+RSI":    up if ((up>0 and rsi_ok_l) or (up<0 and rsi_ok_s)) else 0,
+                "EMA+GAP":    up if ((up>0 and gap>0) or (up<0 and gap<0)) else 0,
+                "EMA+RSI+GAP":up if ((up>0 and rsi_ok_l and gap>0) or (up<0 and rsi_ok_s and gap<0)) else 0,
+            }
+            for i in range(k10+1, n-1):
+                # 볼륨 스파이크 (직전 3봉 내 블록오더 + 방향 일치)
+                spike = 0
+                for j in range(max(k10, i-3), i+1):
+                    if V[j] > 2.0*v20:
+                        spike = 1 if C[j] > O[j] else -1
+                dev = (C[i]-vwap[i])/sd[i] if sd[i] > 1e-9 else 0.0
+                for dname, ddir in dirs.items():
+                    if ddir == 0: continue
+                    # 롱: -1σ 이하 터치 / 숏: +1σ 이상
+                    if ddir > 0 and dev > -1.0: continue
+                    if ddir < 0 and dev < 1.0: continue
+                    ep = C[i]
+                    tgt_mid = vwap; tgt_band = None
+                    res_mid = res_band = None; stop_hit = False
+                    for j in range(i+1, n):
+                        bandU = vwap[j] + sd[j]; bandL = vwap[j] - sd[j]
+                        stopU = vwap[j] + 2*sd[j]; stopL = vwap[j] - 2*sd[j]
+                        if ddir > 0:
+                            if L[j] <= stopL and res_mid is None and res_band is None:
+                                stop_hit = True; res_mid = res_band = (stopL/ep-1)*100; break
+                            if res_mid is None and H[j] >= vwap[j]: res_mid = (vwap[j]/ep-1)*100
+                            if res_band is None and H[j] >= bandU: res_band = (bandU/ep-1)*100; break
+                        else:
+                            if H[j] >= stopU and res_mid is None and res_band is None:
+                                stop_hit = True; res_mid = res_band = (ep/stopU-1)*100; break
+                            if res_mid is None and L[j] <= vwap[j]: res_mid = (ep/vwap[j]-1)*100
+                            if res_band is None and L[j] <= bandL: res_band = (ep/bandL-1)*100; break
+                    if res_mid is None:  res_mid  = ((C[-1]/ep-1)*100) if ddir>0 else ((ep/C[-1]-1)*100)
+                    if res_band is None: res_band = ((C[-1]/ep-1)*100) if ddir>0 else ((ep/C[-1]-1)*100)
+                    trades.append(dict(d=str(d), rule=dname, dir=ddir, dev=dev, spike=spike,
+                                       mid=res_mid, band=res_band, stop=stop_hit))
+            prev_close = C[-1]
+        out[tk] = trades
+    return out
+
+def analyze_vwap(res):
+    rep = []; data = {}
+    for tk, trades in res.items():
+        if not trades:
+            rep.append(f"[{tk}] 트레이드 없음"); continue
+        R = {}
+        rep.append(f"\n[{tk}] 총 트레이드 {len(trades)}건 (60일)")
+        for rule in ("EMA", "EMA+RSI", "EMA+GAP", "EMA+RSI+GAP"):
+            sub = [t for t in trades if t["rule"] == rule]
+            if len(sub) < 10: 
+                rep.append(f"  {rule:12s} n={len(sub):4d} (표본부족)"); continue
+            for tgt in ("mid", "band"):
+                wins = sum(1 for t in sub if t[tgt] > 0)
+                wr = wins/len(sub)*100; ci = _wilson(wins, len(sub))
+                avg = sum(t[tgt] for t in sub)/len(sub)
+                tot = sum(t[tgt] for t in sub)
+                lbl = "VWAP복귀" if tgt=="mid" else "상단밴드"
+                R[f"{rule}|{tgt}"] = dict(n=len(sub), win=round(wr,1), ci=list(ci), avg=round(avg,4), total=round(tot,2))
+                rep.append(f"  {rule:12s} {lbl:8s} n={len(sub):4d} 승률 {wr:5.1f}% CI({ci[0]}~{ci[1]}) 평균 {avg:+.4f}% 합계 {tot:+.1f}%")
+            # 볼륨 스파이크 유무 비교 (VWAP복귀 기준)
+            for sp, nm in ((1,"볼륨스파이크 동일방향"), (0,"스파이크 없음")):
+                ss = [t for t in sub if (t["spike"] == t["dir"] if sp else t["spike"] == 0)]
+                if len(ss) < 10: continue
+                w = sum(1 for t in ss if t["mid"] > 0); wr2 = w/len(ss)*100
+                ci2 = _wilson(w, len(ss)); avg2 = sum(t["mid"] for t in ss)/len(ss)
+                R[f"{rule}|spike{sp}"] = dict(n=len(ss), win=round(wr2,1), ci=list(ci2), avg=round(avg2,4))
+                rep.append(f"      └ {nm:16s} n={len(ss):4d} 승률 {wr2:5.1f}% CI({ci2[0]}~{ci2[1]}) 평균 {avg2:+.4f}%")
+        data[tk] = R
+    return "\n".join(rep), data
+
 def analyze_0dte(res):
     rep = []; out = {}
     for tk, rows in res.items():
@@ -2395,6 +2515,14 @@ def main():
         except Exception as ex:
             errors["backtest"] = str(ex)
 
+    vw_txt = ""; vw_data = {}
+    if os.environ.get("VWAP", "1") != "0":
+        try:
+            print("  VWAP 밴드 백테스트...", flush=True)
+            vw_txt, vw_data = analyze_vwap(run_vwap_backtest())
+            print("  VWAP 완료")
+        except Exception as _ex:
+            errors["vwap"] = f"{type(_ex).__name__}: {_ex}"; print(f"  VWAP 실패: {_ex}")
     dte_txt = ""; dte_data = {}
     if os.environ.get("DTE", "1") != "0":
         try:
@@ -2411,6 +2539,8 @@ def main():
                                  "report": bt_txt, "data": bt_data},
                    "dte": {"at": dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET"),
                            "report": dte_txt, "data": dte_data},
+                   "vwap": {"at": dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET"),
+                            "report": vw_txt, "data": vw_data},
                    "errors": {k: str(v)[:300] for k, v in (errors or {}).items()}},
                   f, ensure_ascii=False, indent=1)
 
