@@ -1996,10 +1996,15 @@ def run_vwap_backtest():
             }
             for i in range(k10+1, n-1):
                 # 볼륨 스파이크 (직전 3봉 내 블록오더 + 방향 일치)
-                spike = 0
+                sp13 = sp15 = sp20 = 0; vmax = 0.0
                 for j in range(max(k10, i-3), i+1):
-                    if V[j] > 2.0*v20:
-                        spike = 1 if C[j] > O[j] else -1
+                    ratio = V[j]/v20 if v20 else 0
+                    sgn = 1 if C[j] > O[j] else -1
+                    if ratio > 1.3 and sp13 == 0: sp13 = sgn
+                    if ratio > 1.5 and sp15 == 0: sp15 = sgn
+                    if ratio > 2.0 and sp20 == 0: sp20 = sgn
+                    vmax = max(vmax, ratio)
+                spike = sp20
                 dev = (C[i]-vwap[i])/sd[i] if sd[i] > 1e-9 else 0.0
                 for dname, ddir in dirs.items():
                     if ddir == 0: continue
@@ -2025,6 +2030,7 @@ def run_vwap_backtest():
                     if res_mid is None:  res_mid  = ((C[-1]/ep-1)*100) if ddir>0 else ((ep/C[-1]-1)*100)
                     if res_band is None: res_band = ((C[-1]/ep-1)*100) if ddir>0 else ((ep/C[-1]-1)*100)
                     trades.append(dict(d=str(d), rule=dname, dir=ddir, dev=dev, spike=spike,
+                                       sp13=sp13, sp15=sp15, vmax=round(vmax,2),
                                        mid=res_mid, band=res_band, stop=stop_hit))
             prev_close = C[-1]
         out[tk] = trades
@@ -2049,14 +2055,42 @@ def analyze_vwap(res):
                 lbl = "VWAP복귀" if tgt=="mid" else "상단밴드"
                 R[f"{rule}|{tgt}"] = dict(n=len(sub), win=round(wr,1), ci=list(ci), avg=round(avg,4), total=round(tot,2))
                 rep.append(f"  {rule:12s} {lbl:8s} n={len(sub):4d} 승률 {wr:5.1f}% CI({ci[0]}~{ci[1]}) 평균 {avg:+.4f}% 합계 {tot:+.1f}%")
-            # 볼륨 스파이크 유무 비교 (VWAP복귀 기준)
-            for sp, nm in ((1,"볼륨스파이크 동일방향"), (0,"스파이크 없음")):
-                ss = [t for t in sub if (t["spike"] == t["dir"] if sp else t["spike"] == 0)]
+            # 볼륨 스파이크 단계별 (상단밴드 익절 기준)
+            for key, nm in (("sp13","볼륨1.3배+"), ("sp15","볼륨1.5배+"), ("spike","볼륨2.0배+")):
+                for match, lbl in ((True,"방향일치"), (False,"없음")):
+                    ss = [t for t in sub if (t[key] == t["dir"]) == match and (t[key] != 0 or not match)]
+                    if len(ss) < 20: continue
+                    w = sum(1 for t in ss if t["band"] > 0); wr2 = w/len(ss)*100
+                    ci2 = _wilson(w, len(ss)); avg2 = sum(t["band"] for t in ss)/len(ss)
+                    R[f"{rule}|{key}|{lbl}"] = dict(n=len(ss), win=round(wr2,1), ci=list(ci2), avg=round(avg2,4))
+                    rep.append(f"      └ {nm} {lbl:6s} n={len(ss):4d} 승률 {wr2:5.1f}% CI({ci2[0]}~{ci2[1]}) 평균 {avg2:+.4f}%")
+        # 월별 / 주별 분해 (EMA+GAP · 상단밴드 기준)
+        best = [t for t in trades if t["rule"] == "EMA+GAP"]
+        if best:
+            import datetime as _dt
+            rep.append(f"  ─ 월별 (EMA+GAP · 상단밴드) ─")
+            R["monthly"] = {}
+            for m in sorted(set(t["d"][:7] for t in best)):
+                ss = [t for t in best if t["d"][:7] == m]
                 if len(ss) < 10: continue
-                w = sum(1 for t in ss if t["mid"] > 0); wr2 = w/len(ss)*100
-                ci2 = _wilson(w, len(ss)); avg2 = sum(t["mid"] for t in ss)/len(ss)
-                R[f"{rule}|spike{sp}"] = dict(n=len(ss), win=round(wr2,1), ci=list(ci2), avg=round(avg2,4))
-                rep.append(f"      └ {nm:16s} n={len(ss):4d} 승률 {wr2:5.1f}% CI({ci2[0]}~{ci2[1]}) 평균 {avg2:+.4f}%")
+                w = sum(1 for t in ss if t["band"] > 0); wr2 = w/len(ss)*100
+                avg2 = sum(t["band"] for t in ss)/len(ss); tot = sum(t["band"] for t in ss)
+                days_n = len(set(t["d"] for t in ss))
+                R["monthly"][m] = dict(n=len(ss), days=days_n, win=round(wr2,1), avg=round(avg2,4), total=round(tot,1))
+                rep.append(f"    {m} {days_n:2d}일 n={len(ss):4d} 승률 {wr2:5.1f}% 평균 {avg2:+.4f}% 합계 {tot:+.1f}%")
+            rep.append(f"  ─ 주별 ─")
+            R["weekly"] = {}
+            for t in best:
+                y, mo, dd = map(int, t["d"].split("-"))
+                t["_w"] = _dt.date(y, mo, dd).isocalendar()[:2]
+            for wk in sorted(set(t["_w"] for t in best)):
+                ss = [t for t in best if t["_w"] == wk]
+                if len(ss) < 5: continue
+                w = sum(1 for t in ss if t["band"] > 0); wr2 = w/len(ss)*100
+                tot = sum(t["band"] for t in ss)
+                mon = min(t["d"] for t in ss)
+                R["weekly"][f"{wk[0]}W{wk[1]}"] = dict(start=mon, n=len(ss), win=round(wr2,1), total=round(tot,1))
+                rep.append(f"    {mon} 주 n={len(ss):3d} 승률 {wr2:5.1f}% 합계 {tot:+.1f}%")
         data[tk] = R
     return "\n".join(rep), data
 
