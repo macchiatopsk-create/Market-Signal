@@ -1774,6 +1774,127 @@ def run_backtest():
     finally:
         trend, yf_ohlc = orig_trend, orig_yf
 
+# ===========================================================================
+# 0DTE 장중 시스템 (기존 Bias/H 와 완전 분리 · 독립 실험)
+#   판단: 당일 10:00 ET (오프닝레인지 확정 후) · 청산: 종가
+#   도구 6종 — VWAP위치 / OR돌파 / 갭 / EMA9-21 / RSI14 / RVOL
+#   목적: "콜이냐 풋이냐"를 장중에 판단할 근거가 실제로 있는지 실측
+# ===========================================================================
+def _ema(vals, n):
+    k = 2.0 / (n + 1); out = []; e = None
+    for v in vals:
+        e = v if e is None else v * k + e * (1 - k)
+        out.append(e)
+    return out
+
+def _rsi(vals, n=14):
+    if len(vals) < n + 1: return [None] * len(vals)
+    out = [None] * len(vals); gains = []; losses = []
+    for i in range(1, len(vals)):
+        d = vals[i] - vals[i-1]
+        gains.append(max(d, 0.0)); losses.append(max(-d, 0.0))
+        if i >= n:
+            ag = sum(gains[-n:]) / n; al = sum(losses[-n:]) / n
+            out[i] = 100.0 if al == 0 else 100 - 100 / (1 + ag / al)
+    return out
+
+def run_0dte_backtest():
+    """yfinance 5분봉 60일로 장중 방향 예측력 실측 (표본 = 거래일수 × 2티커)."""
+    import pandas as _pd
+    res = {}
+    for tk in ("SPY", "QQQ"):
+        df = yf.Ticker(tk).history(period="60d", interval="5m")
+        if df is None or df.empty: continue
+        df = df[["Open","High","Low","Close","Volume"]].dropna()
+        try: df.index = df.index.tz_convert("America/New_York")
+        except Exception: pass
+        df = df[(df.index.time >= dt.time(9,30)) & (df.index.time < dt.time(16,0))]
+        days = sorted(set(df.index.date))
+        rows = []; prev_close = None; vol_hist = []
+        for d in days:
+            day = df[df.index.date == d]
+            if len(day) < 60: 
+                prev_close = float(day["Close"].iloc[-1]) if len(day) else prev_close
+                continue
+            o = day.iloc[:6]                      # 9:30~10:00 = OR
+            upto10 = day.iloc[:6]
+            after = day.iloc[6:]                  # 10:00 이후
+            if len(after) < 10: continue
+            or_h = float(o["High"].max()); or_l = float(o["Low"].min())
+            px10 = float(day["Close"].iloc[5])    # 10:00 시점 가격 (진입가)
+            close = float(day["Close"].iloc[-1])
+            # VWAP (10시까지 누적)
+            tp = (upto10["High"] + upto10["Low"] + upto10["Close"]) / 3
+            vw = float((tp * upto10["Volume"]).sum() / max(upto10["Volume"].sum(), 1))
+            # 갭
+            open_px = float(day["Open"].iloc[0])
+            gap = (open_px / prev_close - 1) * 100 if prev_close else 0.0
+            # EMA / RSI (5분 종가 기준, 10시까지)
+            cl = [float(x) for x in day["Close"].iloc[:6]]
+            hist_cl = [float(x) for x in df["Close"].iloc[max(0, df.index.get_loc(day.index[5]) - 60):df.index.get_loc(day.index[5])+1]]
+            e9 = _ema(hist_cl, 9)[-1]; e21 = _ema(hist_cl, 21)[-1]
+            rsi = _rsi(hist_cl, 14)[-1]
+            # RVOL (10시까지 거래량 vs 최근 20일 같은 구간 평균)
+            v10 = float(upto10["Volume"].sum())
+            rvol = v10 / (sum(vol_hist[-20:]) / len(vol_hist[-20:])) if len(vol_hist) >= 5 else 1.0
+            vol_hist.append(v10)
+            fwd = (close / px10 - 1) * 100        # 10시→종가 수익률 (%)
+            hi = float(after["High"].max()); lo = float(after["Low"].min())
+            rows.append(dict(d=str(d), px10=px10, fwd=fwd,
+                             vwap_pos=(px10 / vw - 1) * 100,
+                             or_break=(1 if px10 > or_h else -1 if px10 < or_l else 0),
+                             or_w=(or_h / or_l - 1) * 100,
+                             gap=gap, ema=(1 if e9 > e21 else -1), ema_gap=(e9 / e21 - 1) * 100,
+                             rsi=rsi, rvol=rvol,
+                             mfe=(hi / px10 - 1) * 100, mae=(lo / px10 - 1) * 100))
+            prev_close = close
+        res[tk] = rows
+    return res
+
+def analyze_0dte(res):
+    rep = []; out = {}
+    for tk, rows in res.items():
+        if len(rows) < 20: 
+            rep.append(f"[{tk}] 표본 부족 ({len(rows)})"); continue
+        R = {"n": len(rows), "tools": {}}
+        rep.append(f"\n[{tk}] 표본 {len(rows)}일 · 10:00 진입 → 종가 청산")
+        base_up = sum(1 for r in rows if r["fwd"] > 0) / len(rows) * 100
+        R["base_up"] = round(base_up, 1)
+        rep.append(f"  기준선(무조건 롱) 상승 {base_up:.1f}% · 평균 {sum(r['fwd'] for r in rows)/len(rows):+.3f}%")
+        TOOLS = [
+            ("VWAP 위",      lambda r: r["vwap_pos"] > 0),
+            ("VWAP 아래",    lambda r: r["vwap_pos"] < 0),
+            ("OR 상단돌파",  lambda r: r["or_break"] == 1),
+            ("OR 하단이탈",  lambda r: r["or_break"] == -1),
+            ("OR 내부",      lambda r: r["or_break"] == 0),
+            ("갭업 +0.3%↑",  lambda r: r["gap"] >= 0.3),
+            ("갭다운 -0.3%↓",lambda r: r["gap"] <= -0.3),
+            ("EMA9>21",      lambda r: r["ema"] == 1),
+            ("EMA9<21",      lambda r: r["ema"] == -1),
+            ("RSI>70",       lambda r: r["rsi"] is not None and r["rsi"] > 70),
+            ("RSI<30",       lambda r: r["rsi"] is not None and r["rsi"] < 30),
+            ("RVOL>1.2",     lambda r: r["rvol"] > 1.2),
+            ("RVOL<0.8",     lambda r: r["rvol"] < 0.8),
+            ("VWAP위+OR돌파", lambda r: r["vwap_pos"] > 0 and r["or_break"] == 1),
+            ("VWAP아래+OR이탈", lambda r: r["vwap_pos"] < 0 and r["or_break"] == -1),
+            ("VWAP위+OR돌파+RVOL1.2", lambda r: r["vwap_pos"] > 0 and r["or_break"] == 1 and r["rvol"] > 1.2),
+            ("VWAP아래+OR이탈+RVOL1.2", lambda r: r["vwap_pos"] < 0 and r["or_break"] == -1 and r["rvol"] > 1.2),
+        ]
+        for nm, fn in TOOLS:
+            sub = [r for r in rows if fn(r)]
+            if len(sub) < 5: 
+                rep.append(f"    {nm:22s} n={len(sub):3d} (표본부족)"); continue
+            up = sum(1 for r in sub if r["fwd"] > 0) / len(sub) * 100
+            avg = sum(r["fwd"] for r in sub) / len(sub)
+            med_mfe = sorted(r["mfe"] for r in sub)[len(sub)//2]
+            med_mae = sorted(r["mae"] for r in sub)[len(sub)//2]
+            ci = _wilson(sum(1 for r in sub if r["fwd"] > 0), len(sub))
+            R["tools"][nm] = dict(n=len(sub), up=round(up,1), ci=list(ci), avg=round(avg,3),
+                                  mfe=round(med_mfe,3), mae=round(med_mae,3))
+            rep.append(f"    {nm:22s} n={len(sub):3d} 상승 {up:5.1f}% CI({ci[0]}~{ci[1]}) 평균 {avg:+.3f}% MFE {med_mfe:+.2f}% MAE {med_mae:+.2f}%")
+        out[tk] = R
+    return "\n".join(rep), out
+
 def backtest_block(txt, data):
     if not txt:
         return ""
@@ -2109,11 +2230,22 @@ def main():
         except Exception as ex:
             errors["backtest"] = str(ex)
 
+    dte_txt = ""; dte_data = {}
+    if os.environ.get("DTE", "1") != "0":
+        try:
+            print("  0DTE 장중 백테스트 (5분봉 60일)...", flush=True)
+            dte_txt, dte_data = analyze_0dte(run_0dte_backtest())
+            print("  0DTE 완료")
+        except Exception as ex:
+            errors["0dte"] = str(ex); print(f"  0DTE 실패: {ex}")
+
     # history 파일에 백테스트 결과 동봉 → 기존 워크플로가 그대로 커밋 (yml 수정 불필요)
     with open(HIST_PATH, "w", encoding="utf-8") as f:
         json.dump({"days": hist,
                    "backtest": {"at": dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET"),
-                                 "report": bt_txt, "data": bt_data}},
+                                 "report": bt_txt, "data": bt_data},
+                   "dte": {"at": dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET"),
+                           "report": dte_txt, "data": dte_data}},
                   f, ensure_ascii=False, indent=1)
 
     now = dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET")
@@ -2136,7 +2268,9 @@ def main():
                     prevHigh=nq_risk["high"], prevLow=nq_risk["low"], prevClose=nq_risk["close"], refDate=today),
     }
     tp_js = tradeplan_script(tp_data)
-    html = render(rtab, sptab, nqtab, vtab, now, errors, tp_js + backtest_block(bt_txt, bt_data))
+    dte_block = (f'<details class="trend-fold" style="margin-top:12px"><summary>0DTE 장중 실험 (10:00 진입 · 독립 시스템)</summary>'
+                 f'<pre style="font-size:11px;line-height:1.6;color:#6d7a8c;overflow-x:auto;padding:10px">{dte_txt}</pre></details>') if dte_txt else ""
+    html = render(rtab, sptab, nqtab, vtab, now, errors, tp_js + backtest_block(bt_txt, bt_data) + dte_block)
     with open(OUT_HTML, "w", encoding="utf-8") as f:
         f.write(html)
     write_pwa_assets()
