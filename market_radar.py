@@ -2040,6 +2040,95 @@ def run_vwap_backtest():
         out[tk] = trades
     return out
 
+def run_v2_backtest():
+    """v2 룰 백테스트: 10:00 점수 >= |3| → 즉시 진입, 기초자산 기준 TP/SL 근사.
+       옵션 프리미엄은 없으므로 기초자산 움직임 %와 필요 이동폭으로 판정."""
+    out = {}
+    for tk in ("SPY", "QQQ"):
+        df = yf.Ticker(tk).history(period="60d", interval="5m")
+        if df is None or df.empty: continue
+        df = df[["Open","High","Low","Close","Volume"]].dropna()
+        try: df.index = df.index.tz_convert("America/New_York")
+        except Exception: pass
+        df = df[(df.index.time >= dt.time(9,30)) & (df.index.time < dt.time(16,0))]
+        days = sorted(set(df.index.date)); rows = []; prev_close = None
+        for d in days:
+            day = df[df.index.date == d]
+            if len(day) < 60:
+                if len(day): prev_close = float(day["Close"].iloc[-1])
+                continue
+            O=[float(x) for x in day["Open"]]; H=[float(x) for x in day["High"]]
+            L=[float(x) for x in day["Low"]]; C=[float(x) for x in day["Close"]]; V=[float(x) for x in day["Volume"]]
+            k10 = 5
+            cpv=cv=cpv2=0.0
+            for i in range(k10+1):
+                tp=(H[i]+L[i]+C[i])/3; cpv+=tp*V[i]; cv+=V[i]
+            vwap = cpv/cv if cv else C[k10]
+            gap = (O[0]/prev_close-1)*100 if prev_close else 0.0
+            i10 = list(df.index).index(day.index[k10])
+            hist=[float(x) for x in df["Close"].iloc[max(0,i10-60):i10+1]]
+            def _e(v,p):
+                kk=2/(p+1); e=None
+                for x in v: e = x if e is None else x*kk+e*(1-kk)
+                return e
+            e9,e21=_e(hist,9),_e(hist,21); rs=_rsi(hist,14)[-1]
+            px10 = float(day["Open"].iloc[k10+1]) if len(day) > k10+1 else C[k10]
+            s = 0
+            s += 1 if gap>=0.3 else (-1 if gap<=-0.3 else 0)
+            s += 1 if e9>e21 else -1
+            s += 1 if px10>vwap else -1
+            if rs is not None: s += 1 if rs>60 else (-1 if rs<40 else 0)
+            if abs(s) < 3:
+                prev_close = C[-1]; continue
+            side = 1 if s > 0 else -1
+            # 14:30 = 9:30 + 300분 = 60번째 5분봉
+            end_i = min(len(C)-1, 60)
+            path = [(H[j], L[j], C[j]) for j in range(k10+1, end_i+1)]
+            # 기초자산 이동 → 옵션 근사: ATM 0DTE는 대략 기초 0.1% ≈ 프리미엄 8~12%
+            #   보수적으로 10배 레버리지 가정 + 시간당 세타 -8%
+            mult = 10.0; theta_hr = -8.0
+            tp_move = 0.40/mult*100/100  # 필요 기초 이동 % (익절)
+            sl_move = 0.30/mult*100/100
+            res = None; hold = 0
+            for j,(h,l,c) in enumerate(path, start=1):
+                hold = j*5
+                th = theta_hr*(hold/60.0)
+                up = (h/px10-1)*100*side; dn = (l/px10-1)*100*side
+                if up*mult + th >= 40: res=("TP", 40.0, hold); break
+                if dn*mult + th <= -30: res=("SL", -30.0, hold); break
+            if res is None:
+                cc=(path[-1][2]/px10-1)*100*side if path else 0.0
+                th=theta_hr*(hold/60.0)
+                res=("CUT", round(cc*mult+th,1), hold)
+            rows.append(dict(d=str(d), score=s, side=side, reason=res[0], pnl=res[1], hold=res[2],
+                             move=round((path[-1][2]/px10-1)*100*side,3) if path else 0.0))
+            prev_close = C[-1]
+        out[tk]=rows
+    return out
+
+def analyze_v2(res):
+    rep=[]; data={}
+    for tk, rows in res.items():
+        if len(rows)<5: rep.append(f"[{tk}] 표본 {len(rows)} 부족"); continue
+        w=sum(1 for r in rows if r["pnl"]>0); n=len(rows)
+        tot=sum(r["pnl"] for r in rows); avg=tot/n
+        ci=_wilson(w,n)
+        dirw=sum(1 for r in rows if r["move"]>0)
+        rep.append(f"\n[{tk}] v2 진입 {n}건 (60일)")
+        rep.append(f"  옵션 승률 {w/n*100:.1f}% CI({ci[0]}~{ci[1]}) · 평균 {avg:+.1f}% · 합계 {tot:+.0f}%")
+        rep.append(f"  기초자산 방향 적중 {dirw/n*100:.1f}% · 평균 홀드 {sum(r['hold'] for r in rows)/n:.0f}분")
+        for rs_ in ("TP","SL","CUT"):
+            ss=[r for r in rows if r["reason"]==rs_]
+            if ss: rep.append(f"    {rs_}: {len(ss)}건 ({len(ss)/n*100:.0f}%) 평균 {sum(r['pnl'] for r in ss)/len(ss):+.1f}%")
+        for lab,sel in (("롱",1),("숏",-1)):
+            ss=[r for r in rows if r["side"]==sel]
+            if len(ss)>=3:
+                w2=sum(1 for r in ss if r["pnl"]>0)
+                rep.append(f"    {lab} {len(ss)}건 승률 {w2/len(ss)*100:.0f}% 합계 {sum(r['pnl'] for r in ss):+.0f}%")
+        data[tk]=dict(n=n, win=round(w/n*100,1), ci=list(ci), avg=round(avg,1), total=round(tot,0),
+                      dir_win=round(dirw/n*100,1), avg_hold=round(sum(r['hold'] for r in rows)/n))
+    return "\n".join(rep), data
+
 def analyze_vwap(res):
     rep = []; data = {}
     for tk, trades in res.items():
@@ -2607,6 +2696,14 @@ def main():
             print("  VWAP 완료")
         except Exception as _ex:
             errors["vwap"] = f"{type(_ex).__name__}: {_ex}"; print(f"  VWAP 실패: {_ex}")
+    v2_txt = ""; v2_data = {}
+    if os.environ.get("V2", "1") != "0":
+        try:
+            print("  v2 백테스트...", flush=True)
+            v2_txt, v2_data = analyze_v2(run_v2_backtest())
+            print("  v2 완료")
+        except Exception as _ex:
+            errors["v2"] = f"{type(_ex).__name__}: {_ex}"; print(f"  v2 실패: {_ex}")
     dte_txt = ""; dte_data = {}
     if os.environ.get("DTE", "1") != "0":
         try:
@@ -2625,6 +2722,7 @@ def main():
                            "report": dte_txt, "data": dte_data},
                    "vwap": {"at": dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET"),
                             "report": vw_txt, "data": vw_data},
+                   "v2": {"report": v2_txt, "data": v2_data},
                    "errors": {k: str(v)[:300] for k, v in (errors or {}).items()}},
                   f, ensure_ascii=False, indent=1)
 
