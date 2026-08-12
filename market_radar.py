@@ -2067,6 +2067,20 @@ def analyze_vwap(res):
                     ci2 = _wilson(w, len(ss)); avg2 = sum(t["band"] for t in ss)/len(ss)
                     R[f"{rule}|{key}|{lbl}"] = dict(n=len(ss), win=round(wr2,1), ci=list(ci2), avg=round(avg2,4))
                     rep.append(f"      └ {nm} {lbl:6s} n={len(ss):4d} 승률 {wr2:5.1f}% CI({ci2[0]}~{ci2[1]}) 평균 {avg2:+.4f}%")
+        # 진입 신호 발생일 목록 (옵션 백테스트용) — 밴드폭 넓은 날만
+        bg0 = [t for t in trades if t["rule"] == "EMA+GAP"]
+        if bg0:
+            bws0 = sorted(t["bw"] for t in bg0); cut = bws0[2*len(bws0)//3]
+            sig = {}
+            for t in bg0:
+                if t["bw"] < cut: continue
+                s = sig.setdefault(t["d"], {"n":0,"dir":t["dir"],"bw":round(t["bw"],3),"wins":0})
+                s["n"] += 1
+                if t["band"] > 0: s["wins"] += 1
+            R["signal_days"] = {k: v for k, v in sorted(sig.items(), reverse=True)[:25]}
+            rep.append(f"  ─ 진입 신호일 (밴드폭 ≥{cut:.3f}%) 최근 25일 ─")
+            for k, v in sorted(sig.items(), reverse=True)[:25]:
+                rep.append(f"    {k} {'롱' if v['dir']>0 else '숏'} 진입 {v['n']}회 적중 {v['wins']}회 밴드폭 {v['bw']:.2f}%")
         # 밴드폭 레짐별 (EMA+GAP · 상단밴드)
         bg = [t for t in trades if t["rule"] == "EMA+GAP"]
         if len(bg) >= 50:
