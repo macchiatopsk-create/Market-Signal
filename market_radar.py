@@ -2164,6 +2164,96 @@ def run_v3_backtest():
         out[tk]=trades
     return out
 
+def run_v4_backtest():
+    """v4: 추세 방향 + 반대편 밴드에서 '저항확인+반전봉' 후 되돌림 진입, 타겟=중간선."""
+    import math
+    out={}
+    for tk in ("SPY","QQQ"):
+        df=yf.Ticker(tk).history(period="60d", interval="5m")
+        if df is None or df.empty: continue
+        df=df[["Open","High","Low","Close","Volume"]].dropna()
+        try: df.index=df.index.tz_convert("America/New_York")
+        except Exception: pass
+        df=df[(df.index.time>=dt.time(9,30))&(df.index.time<dt.time(16,0))]
+        days=sorted(set(df.index.date)); trades=[]; prev_close=None
+        for d in days:
+            day=df[df.index.date==d]
+            if len(day)<60:
+                if len(day): prev_close=float(day["Close"].iloc[-1])
+                continue
+            O=[float(x) for x in day["Open"]];H=[float(x) for x in day["High"]]
+            L=[float(x) for x in day["Low"]];C=[float(x) for x in day["Close"]];V=[float(x) for x in day["Volume"]]
+            n=len(C); cpv=cv=cpv2=0.0; vwap=[];sd=[]
+            for i in range(n):
+                tp=(H[i]+L[i]+C[i])/3; cpv+=tp*V[i]; cv+=V[i]; cpv2+=tp*tp*V[i]
+                w=cpv/cv if cv else tp; var=max(cpv2/cv-w*w,0.0) if cv else 0.0
+                vwap.append(w); sd.append(math.sqrt(var))
+            k10=5; gap=(O[0]/prev_close-1)*100 if prev_close else 0.0
+            i10=list(df.index).index(day.index[k10])
+            hist=[float(x) for x in df["Close"].iloc[max(0,i10-60):i10+1]]
+            def _e(v,p):
+                kk=2/(p+1);e=None
+                for x in v: e=x if e is None else x*kk+e*(1-kk)
+                return e
+            e9,e21=_e(hist,9),_e(hist,21)
+            trend = 1 if e9>e21 else -1
+            if (trend>0 and gap<=0) or (trend<0 and gap>=0): trend=0
+            if trend!=0:
+                i=k10+2
+                while i < n-1:
+                    if sd[i]<=1e-9: i+=1; continue
+                    bw=2*sd[i]/vwap[i]*100
+                    up_band=vwap[i]+sd[i]; lo_band=vwap[i]-sd[i]
+                    entered=False
+                    if trend>0:
+                        # 상단 도달 + 직전봉 고점 못 뚫음 + 이 봉 음봉 → 숏(되돌림)
+                        if H[i-1]>=up_band and H[i]<H[i-1] and C[i]<O[i]:
+                            side=-1; entered=True
+                    else:
+                        if L[i-1]<=lo_band and L[i]>L[i-1] and C[i]>O[i]:
+                            side=1; entered=True
+                    if not entered: i+=1; continue
+                    ep=C[i]; res=None
+                    for j in range(i+1, n):
+                        hold=(j-i)*5
+                        tgt=vwap[j]
+                        if side<0:
+                            if L[j]<=tgt: res=("TARGET",(ep/tgt-1)*100,hold); break
+                            if H[j]>=vwap[j]+2*sd[j]: res=("STOP",(ep/(vwap[j]+2*sd[j])-1)*100,hold); break
+                        else:
+                            if H[j]>=tgt: res=("TARGET",(tgt/ep-1)*100,hold); break
+                            if L[j]<=vwap[j]-2*sd[j]: res=("STOP",((vwap[j]-2*sd[j])/ep-1)*100,hold); break
+                        if hold>=60:
+                            p=(ep/C[j]-1)*100 if side<0 else (C[j]/ep-1)*100
+                            res=("TIMEOUT",p,hold); break
+                    if res is None:
+                        p=(ep/C[-1]-1)*100 if side<0 else (C[-1]/ep-1)*100
+                        res=("EOD",p,(n-1-i)*5)
+                    trades.append(dict(d=str(d),side=side,bw=round(bw,4),reason=res[0],
+                                       pnl=round(res[1],4),hold=res[2]))
+                    i += max(1, res[2]//5)
+                prev_close=C[-1]
+            prev_close=C[-1]
+        out[tk]=trades
+    return out
+
+def analyze_v4(res):
+    rep=[];data={}
+    for tk,tr in res.items():
+        if len(tr)<10: rep.append(f"[{tk}] n={len(tr)} 부족"); continue
+        bws=sorted(t["bw"] for t in tr); cut=bws[len(bws)//2]
+        for nm,ss in (("전체",tr),(f"밴드폭≥{cut:.2f}%",[t for t in tr if t["bw"]>=cut])):
+            if len(ss)<10: continue
+            w=sum(1 for t in ss if t["pnl"]>0); n=len(ss); tot=sum(t["pnl"] for t in ss)
+            ci=_wilson(w,n); hold=sum(t["hold"] for t in ss)/n
+            rep.append(f"\n[{tk}] {nm} n={n} 승률 {w/n*100:.1f}% CI({ci[0]}~{ci[1]}) 평균 {tot/n:+.4f}% 합계 {tot:+.1f}% 홀드 {hold:.0f}분")
+            for r_ in ("TARGET","STOP","TIMEOUT","EOD"):
+                s2=[t for t in ss if t["reason"]==r_]
+                if s2: rep.append(f"    {r_:8s} {len(s2):3d}건({len(s2)/n*100:2.0f}%) 평균 {sum(t['pnl'] for t in s2)/len(s2):+.4f}% 홀드 {sum(t['hold'] for t in s2)/len(s2):.0f}분")
+            if "밴드폭" in nm:
+                data[tk]=dict(n=n,win=round(w/n*100,1),ci=list(ci),avg=round(tot/n,4),hold=round(hold))
+    return "\n".join(rep), data
+
 def analyze_v3(res):
     rep=[]; data={}
     for tk, trades in res.items():
@@ -2874,6 +2964,14 @@ def main():
             print("  VWAP 완료")
         except Exception as _ex:
             errors["vwap"] = f"{type(_ex).__name__}: {_ex}"; print(f"  VWAP 실패: {_ex}")
+    v4_txt = ""; v4_data = {}
+    if os.environ.get("V4", "1") != "0":
+        try:
+            print("  v4 백테스트 (저항확인 되돌림)...", flush=True)
+            v4_txt, v4_data = analyze_v4(run_v4_backtest())
+            print("  v4 완료")
+        except Exception as _ex:
+            errors["v4"] = f"{type(_ex).__name__}: {_ex}"; print(f"  v4 실패: {_ex}")
     v3_txt = ""; v3_data = {}
     if os.environ.get("V3", "1") != "0":
         try:
@@ -2918,7 +3016,9 @@ def main():
                             "report": vw_txt, "data": vw_data},
                    "v2": {"report": v2_txt, "data": v2_data},
                    "v3": {"report": v3_txt, "data": v3_data},
+                   "v4": {"report": v4_txt, "data": v4_data},
                    "v3": {"report": v3_txt, "data": v3_data},
+                   "v4": {"report": v4_txt, "data": v4_data},
                    "errors": {k: str(v)[:300] for k, v in (errors or {}).items()}},
                   f, ensure_ascii=False, indent=1)
 
