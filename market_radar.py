@@ -2015,25 +2015,26 @@ def run_vwap_backtest():
                     if ddir < 0 and dev < 1.0: continue
                     ep = C[i]
                     tgt_mid = vwap; tgt_band = None
-                    res_mid = res_band = None; stop_hit = False
+                    res_mid = res_band = None; stop_hit = False; hold_m = hold_b = None
                     for j in range(i+1, n):
                         bandU = vwap[j] + sd[j]; bandL = vwap[j] - sd[j]
                         stopU = vwap[j] + 2*sd[j]; stopL = vwap[j] - 2*sd[j]
                         if ddir > 0:
                             if L[j] <= stopL and res_mid is None and res_band is None:
-                                stop_hit = True; res_mid = res_band = (stopL/ep-1)*100; break
-                            if res_mid is None and H[j] >= vwap[j]: res_mid = (vwap[j]/ep-1)*100
-                            if res_band is None and H[j] >= bandU: res_band = (bandU/ep-1)*100; break
+                                stop_hit = True; res_mid = res_band = (stopL/ep-1)*100; hold_b = j-i; break
+                            if res_mid is None and H[j] >= vwap[j]: res_mid = (vwap[j]/ep-1)*100; hold_m = j-i
+                            if res_band is None and H[j] >= bandU: res_band = (bandU/ep-1)*100; hold_b = j-i; break
                         else:
                             if H[j] >= stopU and res_mid is None and res_band is None:
-                                stop_hit = True; res_mid = res_band = (ep/stopU-1)*100; break
-                            if res_mid is None and L[j] <= vwap[j]: res_mid = (ep/vwap[j]-1)*100
-                            if res_band is None and L[j] <= bandL: res_band = (ep/bandL-1)*100; break
-                    if res_mid is None:  res_mid  = ((C[-1]/ep-1)*100) if ddir>0 else ((ep/C[-1]-1)*100)
-                    if res_band is None: res_band = ((C[-1]/ep-1)*100) if ddir>0 else ((ep/C[-1]-1)*100)
+                                stop_hit = True; res_mid = res_band = (ep/stopU-1)*100; hold_b = j-i; break
+                            if res_mid is None and L[j] <= vwap[j]: res_mid = (ep/vwap[j]-1)*100; hold_m = j-i
+                            if res_band is None and L[j] <= bandL: res_band = (ep/bandL-1)*100; hold_b = j-i; break
+                    if res_mid is None:  res_mid  = ((C[-1]/ep-1)*100) if ddir>0 else ((ep/C[-1]-1)*100); hold_m = n-1-i
+                    if res_band is None: res_band = ((C[-1]/ep-1)*100) if ddir>0 else ((ep/C[-1]-1)*100); hold_b = n-1-i
                     bw = (2*sd[i]/vwap[i]*100) if vwap[i] else 0.0     # 밴드폭(±1σ) %
                     trades.append(dict(d=str(d), rule=dname, dir=ddir, dev=dev, spike=spike,
                                        bw=round(bw,4), sp13=sp13, sp15=sp15, vmax=round(vmax,2),
+                                       hold_m=(hold_m or 0)*5, hold_b=(hold_b or 0)*5,
                                        mid=res_mid, band=res_band, stop=stop_hit))
             prev_close = C[-1]
         out[tk] = trades
@@ -2067,6 +2068,23 @@ def analyze_vwap(res):
                     ci2 = _wilson(w, len(ss)); avg2 = sum(t["band"] for t in ss)/len(ss)
                     R[f"{rule}|{key}|{lbl}"] = dict(n=len(ss), win=round(wr2,1), ci=list(ci2), avg=round(avg2,4))
                     rep.append(f"      └ {nm} {lbl:6s} n={len(ss):4d} 승률 {wr2:5.1f}% CI({ci2[0]}~{ci2[1]}) 평균 {avg2:+.4f}%")
+        # 홀드 시간 분포 (밴드폭 넓은 구간 · EMA+GAP)
+        bgh = [t for t in trades if t["rule"] == "EMA+GAP"]
+        if bgh:
+            bws1 = sorted(t["bw"] for t in bgh); cut1 = bws1[2*len(bws1)//3]
+            wide = [t for t in bgh if t["bw"] >= cut1]
+            hb = sorted(t["hold_b"] for t in wide); hm = sorted(t["hold_m"] for t in wide)
+            def q(a, p): return a[int(len(a)*p)] if a else 0
+            R["hold"] = dict(band_median=q(hb,.5), band_p25=q(hb,.25), band_p75=q(hb,.75),
+                             mid_median=q(hm,.5), n=len(wide))
+            rep.append(f"  ─ 홀드 시간 (밴드폭 넓음 n={len(wide)}) ─")
+            rep.append(f"    상단밴드 도달: 중앙 {q(hb,.5)}분 (25%:{q(hb,.25)}분 75%:{q(hb,.75)}분)")
+            rep.append(f"    VWAP 복귀:    중앙 {q(hm,.5)}분")
+            for lim, nm in ((15,"15분 내"), (30,"30분 내"), (60,"60분 내")):
+                ss = [t for t in wide if t["hold_b"] <= lim]
+                if not ss: continue
+                w = sum(1 for t in ss if t["band"] > 0)
+                rep.append(f"    {nm} 도달: {len(ss)}건 ({len(ss)/len(wide)*100:.0f}%) 그중 승 {w} ({w/len(ss)*100:.0f}%)")
         # 진입 신호 발생일 목록 (옵션 백테스트용) — 밴드폭 넓은 날만
         bg0 = [t for t in trades if t["rule"] == "EMA+GAP"]
         if bg0:
