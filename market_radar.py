@@ -1816,12 +1816,12 @@ def run_0dte_backtest():
             if len(day) < 60: 
                 prev_close = float(day["Close"].iloc[-1]) if len(day) else prev_close
                 continue
-            o = day.iloc[:6]                      # 9:30~10:00 = OR
+            o = day.iloc[:6]                      # 9:30~09:55 6봉 = OR
             upto10 = day.iloc[:6]
             after = day.iloc[6:]                  # 10:00 이후
             if len(after) < 10: continue
             or_h = float(o["High"].max()); or_l = float(o["Low"].min())
-            px10 = float(day["Close"].iloc[5])    # 10:00 시점 가격 (진입가)
+            px10 = float(after["Open"].iloc[0])   # 10:00 봉 시가 = 진입가 (OR 미포함)
             close = float(day["Close"].iloc[-1])
             # VWAP (10시까지 누적)
             tp = (upto10["High"] + upto10["Low"] + upto10["Close"]) / 3
@@ -1877,8 +1877,12 @@ def analyze_0dte(res):
             ("RVOL<0.8",     lambda r: r["rvol"] < 0.8),
             ("VWAP위+OR돌파", lambda r: r["vwap_pos"] > 0 and r["or_break"] == 1),
             ("VWAP아래+OR이탈", lambda r: r["vwap_pos"] < 0 and r["or_break"] == -1),
-            ("VWAP위+OR돌파+RVOL1.2", lambda r: r["vwap_pos"] > 0 and r["or_break"] == 1 and r["rvol"] > 1.2),
-            ("VWAP아래+OR이탈+RVOL1.2", lambda r: r["vwap_pos"] < 0 and r["or_break"] == -1 and r["rvol"] > 1.2),
+            ("갭업+EMA9>21", lambda r: r["gap"] >= 0.3 and r["ema"] == 1),
+            ("갭다운+EMA9<21", lambda r: r["gap"] <= -0.3 and r["ema"] == -1),
+            ("갭업+VWAP위", lambda r: r["gap"] >= 0.3 and r["vwap_pos"] > 0),
+            ("갭다운+VWAP아래", lambda r: r["gap"] <= -0.3 and r["vwap_pos"] < 0),
+            ("EMA>+RVOL1.2", lambda r: r["ema"] == 1 and r["rvol"] > 1.2),
+            ("EMA<+RVOL<0.8", lambda r: r["ema"] == -1 and r["rvol"] < 0.8),
         ]
         for nm, fn in TOOLS:
             sub = [r for r in rows if fn(r)]
@@ -1892,6 +1896,28 @@ def analyze_0dte(res):
             R["tools"][nm] = dict(n=len(sub), up=round(up,1), ci=list(ci), avg=round(avg,3),
                                   mfe=round(med_mfe,3), mae=round(med_mae,3))
             rep.append(f"    {nm:22s} n={len(sub):3d} 상승 {up:5.1f}% CI({ci[0]}~{ci[1]}) 평균 {avg:+.3f}% MFE {med_mfe:+.2f}% MAE {med_mae:+.2f}%")
+        # ─ 합성 점수: 도구 투표 (-4 ~ +4) ─
+        def dscore(r):
+            s = 0
+            s += 1 if r["gap"] >= 0.3 else (-1 if r["gap"] <= -0.3 else 0)
+            s += 1 if r["ema"] == 1 else -1
+            s += 1 if r["vwap_pos"] > 0 else -1
+            if r["rsi"] is not None:
+                s += 1 if r["rsi"] > 60 else (-1 if r["rsi"] < 40 else 0)
+            return s
+        rep.append("    ─ 합성 DTE 점수 (갭·EMA·VWAP·RSI 투표) ─")
+        R["dte_score"] = {}
+        for lo, hi, nm in ((3,4,"강한 롱 +3↑"),(1,2,"약한 롱 +1~2"),(-2,0,"중립 -2~0"),(-4,-3,"강한 숏 -3↓")):
+            sub = [r for r in rows if lo <= dscore(r) <= hi]
+            if len(sub) < 5:
+                rep.append(f"      {nm:14s} n={len(sub):3d} (표본부족)"); continue
+            up = sum(1 for r in sub if r["fwd"] > 0)
+            wr = up/len(sub)*100; ci = _wilson(up, len(sub))
+            avg = sum(r["fwd"] for r in sub)/len(sub)
+            mfe = sorted(r["mfe"] for r in sub)[len(sub)//2]; mae = sorted(r["mae"] for r in sub)[len(sub)//2]
+            R["dte_score"][nm] = dict(n=len(sub), up=round(wr,1), ci=list(ci), avg=round(avg,3),
+                                      mfe=round(mfe,3), mae=round(mae,3))
+            rep.append(f"      {nm:14s} n={len(sub):3d} 상승 {wr:5.1f}% CI({ci[0]}~{ci[1]}) 평균 {avg:+.3f}% MFE {mfe:+.2f}% MAE {mae:+.2f}%")
         out[tk] = R
     return "\n".join(rep), out
 
