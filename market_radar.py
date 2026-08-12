@@ -2191,6 +2191,99 @@ def analyze_v3(res):
         data[tk]=R
     return "\n".join(rep), data
 
+def run_v3_backtest():
+    """v3: 밴드 진입 → VWAP(중간선) 도달 → 거기서 2봉 내 돌파 못하면 청산."""
+    import math
+    out = {}
+    for tk in ("SPY", "QQQ"):
+        df = yf.Ticker(tk).history(period="60d", interval="5m")
+        if df is None or df.empty: continue
+        df = df[["Open","High","Low","Close","Volume"]].dropna()
+        try: df.index = df.index.tz_convert("America/New_York")
+        except Exception: pass
+        df = df[(df.index.time >= dt.time(9,30)) & (df.index.time < dt.time(16,0))]
+        days = sorted(set(df.index.date)); trades = []; prev_close = None
+        for d in days:
+            day = df[df.index.date == d]
+            if len(day) < 60:
+                if len(day): prev_close = float(day["Close"].iloc[-1])
+                continue
+            O=[float(x) for x in day["Open"]];H=[float(x) for x in day["High"]]
+            L=[float(x) for x in day["Low"]];C=[float(x) for x in day["Close"]];V=[float(x) for x in day["Volume"]]
+            n=len(C); cpv=cv=cpv2=0.0; vwap=[]; sd=[]
+            for i in range(n):
+                tp=(H[i]+L[i]+C[i])/3; cpv+=tp*V[i]; cv+=V[i]; cpv2+=tp*tp*V[i]
+                w=cpv/cv if cv else tp; var=max(cpv2/cv-w*w,0.0) if cv else 0.0
+                vwap.append(w); sd.append(math.sqrt(var))
+            k10=5; gap=(O[0]/prev_close-1)*100 if prev_close else 0.0
+            i10=list(df.index).index(day.index[k10])
+            hist=[float(x) for x in df["Close"].iloc[max(0,i10-60):i10+1]]
+            def _e(v,p):
+                kk=2/(p+1);e=None
+                for x in v: e=x if e is None else x*kk+e*(1-kk)
+                return e
+            e9,e21=_e(hist,9),_e(hist,21)
+            up = 1 if e9>e21 else -1
+            ddir = up if ((up>0 and gap>0) or (up<0 and gap<0)) else 0
+            if ddir!=0:
+                for i in range(k10+1, n-1):
+                    if sd[i] <= 1e-9: continue
+                    dev=(C[i]-vwap[i])/sd[i]
+                    bw=2*sd[i]/vwap[i]*100
+                    if ddir>0 and dev>-1.0: continue
+                    if ddir<0 and dev<1.0: continue
+                    ep=C[i]; mid_hit=None; res=None; hold=0
+                    for j in range(i+1, n):
+                        hold=(j-i)*5
+                        if mid_hit is None:
+                            # 중간선 도달?
+                            if (ddir>0 and H[j]>=vwap[j]) or (ddir<0 and L[j]<=vwap[j]):
+                                mid_hit=j
+                                mid_pnl=((vwap[j]/ep-1)*100) if ddir>0 else ((ep/vwap[j]-1)*100)
+                            # 중간선 전에 2σ 손절
+                            elif (ddir>0 and L[j]<=vwap[j]-2*sd[j]) or (ddir<0 and H[j]>=vwap[j]+2*sd[j]):
+                                p=((vwap[j]-2*sd[j])/ep-1)*100 if ddir>0 else (ep/(vwap[j]+2*sd[j])-1)*100
+                                res=("STOP_PRE", p, hold); break
+                        else:
+                            # 중간선 도달 후 2봉 판정
+                            elapsed=j-mid_hit
+                            band=vwap[j]+sd[j] if ddir>0 else vwap[j]-sd[j]
+                            hit_band=(H[j]>=band) if ddir>0 else (L[j]<=band)
+                            if hit_band:
+                                p=((band/ep-1)*100) if ddir>0 else ((ep/band-1)*100)
+                                res=("BAND", p, hold); break
+                            if elapsed>=2:
+                                p=((C[j]/ep-1)*100) if ddir>0 else ((ep/C[j]-1)*100)
+                                res=("MID_EXIT", p, hold); break
+                    if res is None:
+                        p=((C[-1]/ep-1)*100) if ddir>0 else ((ep/C[-1]-1)*100)
+                        res=("EOD", p, (n-1-i)*5)
+                    trades.append(dict(d=str(d), dir=ddir, bw=round(bw,4), reason=res[0],
+                                       pnl=round(res[1],4), hold=res[2]))
+                    prev_close=C[-1]
+            prev_close=C[-1]
+        out[tk]=trades
+    return out
+
+def analyze_v3(res):
+    rep=[]; data={}
+    for tk, tr in res.items():
+        if len(tr)<20: rep.append(f"[{tk}] 표본 {len(tr)}"); continue
+        bws=sorted(t["bw"] for t in tr); cut=bws[2*len(bws)//3]
+        for nm, ss in (("전체", tr), (f"밴드폭넓음(≥{cut:.2f}%)", [t for t in tr if t["bw"]>=cut])):
+            if len(ss)<20: continue
+            w=sum(1 for t in ss if t["pnl"]>0); n=len(ss)
+            tot=sum(t["pnl"] for t in ss); ci=_wilson(w,n)
+            hold=sum(t["hold"] for t in ss)/n
+            rep.append(f"\n[{tk}] {nm} n={n} 승률 {w/n*100:.1f}% CI({ci[0]}~{ci[1]}) 평균 {tot/n:+.4f}% 합계 {tot:+.1f}% 평균홀드 {hold:.0f}분")
+            for r_ in ("BAND","MID_EXIT","STOP_PRE","EOD"):
+                s2=[t for t in ss if t["reason"]==r_]
+                if s2: rep.append(f"    {r_:9s} {len(s2):4d}건({len(s2)/n*100:2.0f}%) 평균 {sum(t['pnl'] for t in s2)/len(s2):+.4f}% 홀드 {sum(t['hold'] for t in s2)/len(s2):.0f}분")
+            if "넓음" in nm:
+                data[tk]=dict(n=n, win=round(w/n*100,1), ci=list(ci), avg=round(tot/n,4),
+                              total=round(tot,1), hold=round(hold))
+    return "\n".join(rep), data
+
 def analyze_v2(res):
     rep=[]; data={}
     for tk, rows in res.items():
@@ -2789,6 +2882,14 @@ def main():
             print("  v3 완료")
         except Exception as _ex:
             errors["v3"] = f"{type(_ex).__name__}: {_ex}"; print(f"  v3 실패: {_ex}")
+    v3_txt = ""; v3_data = {}
+    if os.environ.get("V3", "1") != "0":
+        try:
+            print("  v3 백테스트 (중간선 2봉 룰)...", flush=True)
+            v3_txt, v3_data = analyze_v3(run_v3_backtest())
+            print("  v3 완료")
+        except Exception as _ex:
+            errors["v3"] = f"{type(_ex).__name__}: {_ex}"; print(f"  v3 실패: {_ex}")
     v2_txt = ""; v2_data = {}
     if os.environ.get("V2", "1") != "0":
         try:
@@ -2816,6 +2917,7 @@ def main():
                    "vwap": {"at": dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET"),
                             "report": vw_txt, "data": vw_data},
                    "v2": {"report": v2_txt, "data": v2_data},
+                   "v3": {"report": v3_txt, "data": v3_data},
                    "v3": {"report": v3_txt, "data": v3_data},
                    "errors": {k: str(v)[:300] for k, v in (errors or {}).items()}},
                   f, ensure_ascii=False, indent=1)
