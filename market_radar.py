@@ -2358,6 +2358,18 @@ def main():
     nqd = build_tab_data("QQQ", nq, nq_risk, inst_nq)
     spd["fg"] = compute_fear_greed(sp_risk, inst_sp, macro)
     nqd["fg"] = compute_fear_greed(nq_risk, inst_nq, macro)
+    for _tk, _mk, _d in (("SPY","sp",spd), ("QQQ","nq",nqd)):
+        try:
+            _d["dte_today"] = today_0dte_signal(_tk)
+            if _d["dte_today"] is None:
+                errors[f"dte_{_tk}"] = "조건미달(데이터 부족/장중 봉 없음)"
+                print(f"  0DTE {_tk}: 신호 없음 (조건미달)")
+            else:
+                print(f"  0DTE {_tk}: 점수 {_d['dte_today']['score']}")
+        except Exception as _ex:
+            _d["dte_today"] = None; errors[f"dte_{_tk}"] = f"{type(_ex).__name__}: {_ex}"
+            print(f"  0DTE {_tk} 실패: {type(_ex).__name__}: {_ex}")
+
 
     def _pred(d, trend_sig, risk, inst):
         return dict(next_score=d["bias"]["score"], next_label=d["bias"]["label"],
@@ -2383,17 +2395,6 @@ def main():
         except Exception as ex:
             errors["backtest"] = str(ex)
 
-    for _tk, _mk, _d in (("SPY","sp",spd), ("QQQ","nq",nqd)):
-        try:
-            _d["dte_today"] = today_0dte_signal(_tk)
-            if _d["dte_today"] is None:
-                errors[f"dte_{_tk}"] = "조건미달(데이터 부족/장중 봉 없음)"
-                print(f"  0DTE {_tk}: 신호 없음 (조건미달)")
-            else:
-                print(f"  0DTE {_tk}: 점수 {_d['dte_today']['score']}")
-        except Exception as _ex:
-            _d["dte_today"] = None; errors[f"dte_{_tk}"] = f"{type(_ex).__name__}: {_ex}"
-            print(f"  0DTE {_tk} 실패: {type(_ex).__name__}: {_ex}")
     dte_txt = ""; dte_data = {}
     if os.environ.get("DTE", "1") != "0":
         try:
