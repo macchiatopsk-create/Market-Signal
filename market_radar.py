@@ -1918,6 +1918,26 @@ def analyze_0dte(res):
             R["dte_score"][nm] = dict(n=len(sub), up=round(wr,1), ci=list(ci), avg=round(avg,3),
                                       mfe=round(mfe,3), mae=round(mae,3))
             rep.append(f"      {nm:14s} n={len(sub):3d} 상승 {wr:5.1f}% CI({ci[0]}~{ci[1]}) 평균 {avg:+.3f}% MFE {mfe:+.2f}% MAE {mae:+.2f}%")
+        # ─ 월별 분해 (레짐 변화 확인) ─
+        rep.append("    ─ 월별 분해 (레짐 체크) ─")
+        R["monthly"] = {}
+        months = sorted(set(r["d"][:7] for r in rows))
+        for m in months:
+            sub = [r for r in rows if r["d"][:7] == m]
+            if len(sub) < 3: continue
+            up = sum(1 for r in sub if r["fwd"] > 0)
+            avg = sum(r["fwd"] for r in sub)/len(sub)
+            rng = sum(r["mfe"] - r["mae"] for r in sub)/len(sub)
+            # 그 달의 DTE 점수 유효성
+            hi = [r for r in sub if dscore(r) >= 3]; lo_ = [r for r in sub if dscore(r) <= -3]
+            hi_wr = (sum(1 for r in hi if r["fwd"] > 0)/len(hi)*100) if hi else None
+            lo_wr = (sum(1 for r in lo_ if r["fwd"] > 0)/len(lo_)*100) if lo_ else None
+            R["monthly"][m] = dict(n=len(sub), up=round(up/len(sub)*100,1), avg=round(avg,3),
+                                   avg_range=round(rng,3),
+                                   strong_long=dict(n=len(hi), up=(round(hi_wr,1) if hi_wr is not None else None)),
+                                   strong_short=dict(n=len(lo_), up=(round(lo_wr,1) if lo_wr is not None else None)))
+            rep.append(f"      {m} n={len(sub):2d} 상승 {up/len(sub)*100:5.1f}% 평균 {avg:+.3f}% 일중레인지 {rng:.2f}% | "
+                       f"강한롱 {len(hi)}건 {hi_wr if hi_wr is None else round(hi_wr,0)}% · 강한숏 {len(lo_)}건 {lo_wr if lo_wr is None else round(lo_wr,0)}%")
         out[tk] = R
     return "\n".join(rep), out
 
