@@ -1997,8 +1997,10 @@ def run_vwap_backtest():
             for i in range(k10+1, n-1):
                 # 볼륨 스파이크 (직전 3봉 내 블록오더 + 방향 일치)
                 sp13 = sp15 = sp20 = 0; vmax = 0.0
+                _w = V[max(0, i-20):i]                      # 직전 20봉 이동평균
+                vbase = (sum(_w)/len(_w)) if _w else v20
                 for j in range(max(k10, i-3), i+1):
-                    ratio = V[j]/v20 if v20 else 0
+                    ratio = V[j]/vbase if vbase else 0
                     sgn = 1 if C[j] > O[j] else -1
                     if ratio > 1.3 and sp13 == 0: sp13 = sgn
                     if ratio > 1.5 and sp15 == 0: sp15 = sgn
@@ -2029,8 +2031,9 @@ def run_vwap_backtest():
                             if res_band is None and L[j] <= bandL: res_band = (ep/bandL-1)*100; break
                     if res_mid is None:  res_mid  = ((C[-1]/ep-1)*100) if ddir>0 else ((ep/C[-1]-1)*100)
                     if res_band is None: res_band = ((C[-1]/ep-1)*100) if ddir>0 else ((ep/C[-1]-1)*100)
+                    bw = (2*sd[i]/vwap[i]*100) if vwap[i] else 0.0     # 밴드폭(±1σ) %
                     trades.append(dict(d=str(d), rule=dname, dir=ddir, dev=dev, spike=spike,
-                                       sp13=sp13, sp15=sp15, vmax=round(vmax,2),
+                                       bw=round(bw,4), sp13=sp13, sp15=sp15, vmax=round(vmax,2),
                                        mid=res_mid, band=res_band, stop=stop_hit))
             prev_close = C[-1]
         out[tk] = trades
@@ -2064,6 +2067,21 @@ def analyze_vwap(res):
                     ci2 = _wilson(w, len(ss)); avg2 = sum(t["band"] for t in ss)/len(ss)
                     R[f"{rule}|{key}|{lbl}"] = dict(n=len(ss), win=round(wr2,1), ci=list(ci2), avg=round(avg2,4))
                     rep.append(f"      └ {nm} {lbl:6s} n={len(ss):4d} 승률 {wr2:5.1f}% CI({ci2[0]}~{ci2[1]}) 평균 {avg2:+.4f}%")
+        # 밴드폭 레짐별 (EMA+GAP · 상단밴드)
+        bg = [t for t in trades if t["rule"] == "EMA+GAP"]
+        if len(bg) >= 50:
+            bws = sorted(t["bw"] for t in bg); q33 = bws[len(bws)//3]; q66 = bws[2*len(bws)//3]
+            rep.append(f"  ─ 밴드폭 레짐별 (33%={q33:.3f}% / 66%={q66:.3f}%) ─")
+            R["bandwidth"] = {"q33": round(q33,4), "q66": round(q66,4)}
+            for nm, fn in (("좁음(하위33%)", lambda t: t["bw"] < q33),
+                           ("중간", lambda t: q33 <= t["bw"] < q66),
+                           ("넓음(상위33%)", lambda t: t["bw"] >= q66)):
+                ss = [t for t in bg if fn(t)]
+                if len(ss) < 20: continue
+                w = sum(1 for t in ss if t["band"] > 0); wr = w/len(ss)*100
+                ci = _wilson(w, len(ss)); avg = sum(t["band"] for t in ss)/len(ss); tot = sum(t["band"] for t in ss)
+                R["bandwidth"][nm] = dict(n=len(ss), win=round(wr,1), ci=list(ci), avg=round(avg,4), total=round(tot,1))
+                rep.append(f"    {nm:14s} n={len(ss):4d} 승률 {wr:5.1f}% CI({ci[0]}~{ci[1]}) 평균 {avg:+.4f}% 합계 {tot:+.1f}%")
         # 월별 / 주별 분해 (EMA+GAP · 상단밴드 기준)
         best = [t for t in trades if t["rule"] == "EMA+GAP"]
         if best:
