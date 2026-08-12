@@ -1858,10 +1858,12 @@ def today_0dte_signal(tk):
     except Exception: pass
     df = df[(df.index.time >= dt.time(9,30)) & (df.index.time < dt.time(16,0))]
     days = sorted(set(df.index.date))
-    if len(days) < 2: return None
+    if len(days) < 2:
+        raise ValueError(f"거래일 부족 days={len(days)} rows={len(df)}")
     d = days[-1]; day = df[df.index.date == d]
     prev = df[df.index.date == days[-2]]
-    if len(day) < 7 or len(prev) < 10: return None
+    if len(day) < 7 or len(prev) < 10:
+        raise ValueError(f"봉 부족 today={len(day)} prev={len(prev)} date={d}")
     o = day.iloc[:6]; after = day.iloc[6:]
     px10 = float(after["Open"].iloc[0]); close = float(day["Close"].iloc[-1])
     tp = (o["High"] + o["Low"] + o["Close"]) / 3
@@ -2407,7 +2409,8 @@ def main():
                    "backtest": {"at": dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET"),
                                  "report": bt_txt, "data": bt_data},
                    "dte": {"at": dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET"),
-                           "report": dte_txt, "data": dte_data}},
+                           "report": dte_txt, "data": dte_data},
+                   "errors": {k: str(v)[:300] for k, v in (errors or {}).items()}},
                   f, ensure_ascii=False, indent=1)
 
     now = dt.datetime.now(NY).strftime("%Y-%m-%d %H:%M ET")
