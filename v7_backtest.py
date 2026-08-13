@@ -90,9 +90,10 @@ def run(tk, variant):
     pos_of = {ts: i for i, ts in enumerate(idx)}      # 원본의 O(n^2) 검색 제거
     closes_all = [float(x) for x in df["Close"]]
 
-    no_overlap = variant in ("B", "C", "D")
-    time_gate  = variant in ("C", "D")
-    use_regime = variant == "D"
+    no_overlap = variant in ("B", "C", "D", "E", "F")
+    time_gate  = variant in ("C", "D", "E", "F")
+    use_regime = variant in ("D", "E", "F")
+    thresh = {"E": 0.5, "F": 0.0}.get(variant, 1.0)   # 진입 임계 (σ)
 
     days = sorted(set(df.index.date)); trades = []; prev_close = None
     for d in days:
@@ -128,7 +129,7 @@ def run(tk, variant):
                 if time_gate and T[i] >= cut: break
                 dev = (C[i] - vwap[i]) / sd[i]
                 bw = 2 * sd[i] / vwap[i] * 100
-                if (ddir > 0 and dev > -1.0) or (ddir < 0 and dev < 1.0):
+                if (ddir > 0 and dev > -thresh) or (ddir < 0 and dev < thresh):
                     i += 1; continue
 
                 ep = C[i]; mid_hit = None; res = None; last_j = i
@@ -197,13 +198,15 @@ def analyze(trades, tk, variant):
 
 if __name__ == "__main__":
     report = []; out = {}
-    for variant in ("A", "B", "C", "D"):
+    dump = {}
+    for variant in ("A", "B", "C", "D", "E", "F"):
         for tk in TICKERS:
             try:
                 tr = run(tk, variant)
                 rep, data = analyze(tr, tk, variant)
                 report += rep
                 out.setdefault(variant, {})[tk] = data
+                dump.setdefault(variant, {})[tk] = tr
                 print(f"  {variant}/{tk} 완료: {len(tr)}건", flush=True)
             except Exception as e:
                 msg = f"[{tk}/{variant}] 실패: {type(e).__name__}: {e}"
@@ -211,5 +214,5 @@ if __name__ == "__main__":
     txt = "\n".join(report)
     print(txt)
     json.dump({"at": dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
-               "report": txt, "data": out},
+               "report": txt, "data": out, "trades": dump},
               open("v7_result.json", "w"), ensure_ascii=False, indent=1)
