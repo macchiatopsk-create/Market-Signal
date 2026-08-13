@@ -1,0 +1,36 @@
+name: v7-backtest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v7-backtest
+  cancel-in-progress: false
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: run v7 backtest
+        run: python v7_backtest.py
+
+      - name: persist result
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase --autostash || true
+          git add v7_result.json
+          git commit -m "v7 backtest $(date -u +%F_%H%M)" || echo "변동 없음"
+          git push || echo "푸시 스킵"
