@@ -14,10 +14,11 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt
       - run: python premarket_test.py
+      - run: python v8_test.py
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git pull --rebase --autostash || true
-          git add premarket_result.json
+          git add premarket_result.json v8_result.json
           git commit -m "premarket $(date -u +%F_%H%M)" || echo none
           git push || echo skip
