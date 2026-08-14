@@ -52,13 +52,24 @@ def backtest(got):
         return out + ["  3개월물(^VIX3M/^VXV/^VIX6M) 전부 수집 실패 -> 기간구조 계산 불가"]
     out.append(f"\n===== 기간구조 = ^VIX / {long_tk} =====")
 
+    def norm(s):
+        s = s.copy()
+        try: s.index = s.index.tz_localize(None)
+        except (TypeError, AttributeError): pass
+        s.index = pd.to_datetime(s.index).normalize()
+        return s[~s.index.duplicated(keep="last")]
+
     px = {}
     for tk in ("SPY", "QQQ"):
-        px[tk] = yf.Ticker(tk).history(period="3y")["Close"].dropna()
+        px[tk] = norm(yf.Ticker(tk).history(period="3y")["Close"].dropna())
     idx = px["SPY"].index
-    vix = got["^VIX"].reindex(idx).ffill()
-    vl = got[long_tk].reindex(idx).ffill()
+    vix = norm(got["^VIX"]).reindex(idx).ffill()
+    vl = norm(got[long_tk]).reindex(idx).ffill()
     ts = (vix / vl).dropna()
+    out.append(f"  [진단] SPY {len(idx)}일 / VIX 정합 {vix.notna().sum()} / "
+               f"{long_tk} 정합 {vl.notna().sum()} / 기간구조 {len(ts)}")
+    if len(ts) < LOOKBACK + 60:
+        return out + [f"  기간구조 표본 {len(ts)} 부족 (필요 {LOOKBACK+60})"]
 
     df = pd.DataFrame({"ts": ts})
     # look-ahead 없는 rolling 백분위: 오늘 값이 과거 LOOKBACK 안에서 몇 %인지
@@ -74,6 +85,8 @@ def backtest(got):
             df[f"{tk}_r{h}"] = (p.shift(-h) / p - 1) * 100
 
     d = df.dropna(subset=["pct"]).copy()
+    if len(d) == 0:
+        return out + ["  rolling 백분위가 전부 NaN -> 계산 불가"]
     out.append(f"  표본 {len(d)}일  ({d.index[0].date()}~{d.index[-1].date()})")
     out.append(f"  기간구조 값: 중앙 {d['ts'].median():.3f}  백워데이션(>1.0) {d['backw'].mean()*100:.1f}%")
 
