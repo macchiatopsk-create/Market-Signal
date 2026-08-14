@@ -40,16 +40,14 @@ def _grab(tk, tries=3):
 
 
 def vix_map():
-    a = _grab("^VIX9D")
-    if a is None: a = _grab("^VIX")
-    b = _grab("^VIX3M")
-    if a is None or b is None: return {}
-    ts = (a / b.reindex(a.index).ffill()).dropna()
-    def _p(w):
-        if len(w) < 2: return float("nan")
-        return float((w[:-1] < w[-1]).sum()) / (len(w) - 1) * 100
-    pct = ts.rolling(252).apply(_p, raw=True).shift(1)
-    return {str(pd.Timestamp(d).date()): float(v) for d, v in pct.dropna().items()}
+    from v9_test import vix_pct_map, DIAG
+    m = vix_pct_map()
+    if not m:
+        import time
+        time.sleep(10)                     # 레이트리밋 회피 후 1회 재시도
+        m = vix_pct_map()
+    print("\n".join(DIAG))
+    return m
 
 
 def day_frames(tk):
