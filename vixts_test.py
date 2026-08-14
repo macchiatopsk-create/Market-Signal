@@ -62,8 +62,10 @@ def backtest(got):
 
     df = pd.DataFrame({"ts": ts})
     # look-ahead 없는 rolling 백분위: 오늘 값이 과거 LOOKBACK 안에서 몇 %인지
-    df["pct"] = df["ts"].rolling(LOOKBACK).apply(
-        lambda w: (w[:-1] < w[-1]).mean() * 100, raw=True)
+    def _pct(w):
+        if len(w) < 2: return float("nan")
+        return float((w[:-1] < w[-1]).sum()) / (len(w) - 1) * 100
+    df["pct"] = df["ts"].rolling(LOOKBACK).apply(_pct, raw=True)
     df["backw"] = (df["ts"] > 1.0).astype(int)      # 백워데이션 여부
 
     for tk in ("SPY", "QQQ"):
