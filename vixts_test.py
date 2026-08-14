@@ -9,7 +9,7 @@ VIX 기간구조 검증.
   - 거래일 수 명시
   - CI가 겹치면 예측력 없음으로 기각 (F&G 때와 동일 기준)
 """
-import json, math, datetime as dt
+import json, math, datetime as dt, traceback
 import yfinance as yf
 import pandas as pd
 
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     try:
         rep += backtest(got)
     except Exception as e:
-        rep.append(f"백테스트 실패: {type(e).__name__}: {e}")
+        rep.append("백테스트 실패:\n" + traceback.format_exc())
     txt = "\n".join(rep)
     print(txt)
     json.dump({"at": dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"), "report": txt},
