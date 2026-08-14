@@ -1,0 +1,39 @@
+name: research
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "실행할 스크립트 (all / v7 / v9 / v10 / vixts / premarket / credit)"
+        default: "all"
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt
+      - name: run selected
+        run: |
+          T="${{ github.event.inputs.target }}"
+          run_one() { echo "== $1 =="; python "$1" || echo "FAIL $1"; }
+          case "$T" in
+            v7)        run_one v7_backtest.py ;;
+            v9)        run_one v9_test.py ;;
+            v10)       run_one v10_test.py ;;
+            vixts)     run_one vixts_test.py; run_one vixts_confirm.py; run_one vixts_range.py ;;
+            premarket) run_one premarket_test.py ;;
+            credit)    run_one credit_test.py ;;
+            all)       for f in v9_test.py v10_test.py v7_backtest.py; do run_one $f; done ;;
+          esac
+      - name: persist
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase --autostash || true
+          git add *_result.json *_confirm.json *_range.json 2>/dev/null || true
+          git commit -m "research $(date -u +%F_%H%M)" || echo none
+          git push || echo skip

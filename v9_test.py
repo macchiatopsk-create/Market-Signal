@@ -32,7 +32,7 @@ def _n(x):
     return x[~x.index.duplicated(keep="last")]
 
 
-def _grab(tk, tries=3):
+def _grab(tk, tries=4):
     import time
     for i in range(tries):
         try:
@@ -40,7 +40,7 @@ def _grab(tk, tries=3):
             if len(s) > 100: return _n(s)
         except Exception as e:
             print(f"  {tk} 시도{i+1} 실패 {e}")
-        time.sleep(3)
+        time.sleep(5 * (2 ** i))          # 5,10,20,40초 지수 백오프
     return None
 
 

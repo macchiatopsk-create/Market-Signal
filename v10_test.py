@@ -106,10 +106,9 @@ def sim(rt, mode, sig=SIG):
 
     # C/D/E: TP1 중간선 50% + 러너 상단, 손절 당일저점
     day_lo = float(min(L[:ei + 1])) if ei > 0 else float(L[0])
-    stop = day_lo * (1 - 0.0005)
+    stop = day_lo * (1 - 0.0005)          # 진입 시점 당일저점 고정 (설계 의도)
     half = False; tp1 = None
     for i in range(ei + 1, n):
-        day_lo = min(day_lo, L[i - 1] if i > 0 else L[0])
         w, s = W[i], S[i]
         if not half and H[i] >= w:
             tp1, half = w, True
