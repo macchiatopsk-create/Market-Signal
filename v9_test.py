@@ -48,7 +48,7 @@ DIAG = []
 
 
 def vix_pct_map():
-    a = _grab("^VIX9D")
+    a = _grab("^VIX9D") or _grab("^VIX")      # 9일물 실패 시 1개월물로 폴백
     b = _grab("^VIX3M")
     if a is None or b is None:
         DIAG.append(f"  VIX 수집 실패 VIX9D={a is not None} VIX3M={b is not None}")
