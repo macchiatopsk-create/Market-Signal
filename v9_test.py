@@ -44,19 +44,26 @@ def _grab(tk, tries=3):
     return None
 
 
+DIAG = []
+
+
 def vix_pct_map():
-    a = _grab("^VIX9D") 
+    a = _grab("^VIX9D")
     b = _grab("^VIX3M")
     if a is None or b is None:
-        print(f"  VIX 수집 실패 a={a is not None} b={b is not None}")
+        DIAG.append(f"  VIX 수집 실패 VIX9D={a is not None} VIX3M={b is not None}")
         return {}
-    print(f"  VIX 수집 OK VIX9D={len(a)} VIX3M={len(b)}")
+    DIAG.append(f"  VIX 수집 OK VIX9D={len(a)}({a.index[0].date()}~{a.index[-1].date()}) VIX3M={len(b)}")
     ts = (a / b.reindex(a.index).ffill()).dropna()
     def _p(w):
         if len(w) < 2: return float("nan")
         return float((w[:-1] < w[-1]).sum()) / (len(w) - 1) * 100
-    return {str(d.date()): float(v)
-            for d, v in ts.rolling(252).apply(_p, raw=True).shift(1).dropna().items()}
+    DIAG.append(f"  ts 길이 {len(ts)}")
+    pct = ts.rolling(252).apply(_p, raw=True).shift(1)
+    DIAG.append(f"  백분위 유효 {int(pct.notna().sum())}")
+    m = {str(pd.Timestamp(d).date()): float(v) for d, v in pct.dropna().items()}
+    DIAG.append(f"  맵 {len(m)}개, 샘플 {list(m.items())[:2]}")
+    return m
 
 
 def build(tk):
@@ -105,8 +112,12 @@ def rep(tr, lab, out):
 
 def main():
     out = []
-    vmap = vix_pct_map()
+    try:
+        vmap = vix_pct_map()
+    except Exception as e:
+        vmap = {}; DIAG.append(f"  vix_pct_map 예외: {type(e).__name__}: {e}")
     out.append(f"VIX 백분위 맵 {len(vmap)}일")
+    out += DIAG
     for tk in ("SPY", "QQQ"):
         rows = build(tk)
         out.append(f"\n{'='*104}\n[{tk}] 1시간봉 2년 · {len(rows)}거래일 "
