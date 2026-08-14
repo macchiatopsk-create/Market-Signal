@@ -32,9 +32,25 @@ def _n(x):
     return x[~x.index.duplicated(keep="last")]
 
 
+def _grab(tk, tries=3):
+    import time
+    for i in range(tries):
+        try:
+            s = yf.Ticker(tk).history(period="3y")["Close"].dropna()
+            if len(s) > 100: return _n(s)
+        except Exception as e:
+            print(f"  {tk} 시도{i+1} 실패 {e}")
+        time.sleep(3)
+    return None
+
+
 def vix_pct_map():
-    a = _n(yf.Ticker("^VIX9D").history(period="3y")["Close"].dropna())
-    b = _n(yf.Ticker("^VIX3M").history(period="3y")["Close"].dropna())
+    a = _grab("^VIX9D") 
+    b = _grab("^VIX3M")
+    if a is None or b is None:
+        print(f"  VIX 수집 실패 a={a is not None} b={b is not None}")
+        return {}
+    print(f"  VIX 수집 OK VIX9D={len(a)} VIX3M={len(b)}")
     ts = (a / b.reindex(a.index).ffill()).dropna()
     def _p(w):
         if len(w) < 2: return float("nan")
