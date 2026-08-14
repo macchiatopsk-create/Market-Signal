@@ -29,11 +29,14 @@ jobs:
       - name: run credit spread test
         run: python credit_test.py
 
+      - name: run VIX term structure test
+        run: python vixts_test.py
+
       - name: persist result
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git pull --rebase --autostash || true
-          git add v7_result.json credit_result.json
+          git add v7_result.json credit_result.json vixts_result.json
           git commit -m "v7 backtest $(date -u +%F_%H%M)" || echo "변동 없음"
           git push || echo "푸시 스킵"
