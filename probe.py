@@ -1,4 +1,5 @@
-import yfinance as yf, pandas as pd
+import yfinance as yf, pandas as pd, json
+R=[]
 for iv, per in (("5m","60d"),("15m","60d"),("15m","1y"),("15m","2y"),
                 ("30m","1y"),("30m","2y"),("1h","2y"),("1h","5y")):
     try:
@@ -11,7 +12,10 @@ for iv, per in (("5m","60d"),("15m","60d"),("15m","1y"),("15m","2y"),
         days = sorted(set(d.index.date))
         pm = d[(d.index.time>=pd.Timestamp('04:00').time())&(d.index.time<pd.Timestamp('09:30').time())]
         pmd = sorted(set(pm.index.date))
-        print(f"  {iv:4s} {per:4s} 봉 {len(d):6d} 거래일 {len(days):4d} "
+        R.append(f"  {iv:4s} {per:4s} 봉 {len(d):6d} 거래일 {len(days):4d} "
               f"({days[0]}~{days[-1]}) 프리마켓있는날 {len(pmd):4d} 프리마켓봉/일 {len(pm)/max(len(pmd),1):.1f}")
     except Exception as e:
-        print(f"  {iv:4s} {per:4s} 실패 {type(e).__name__}: {e}")
+        R.append(f"  {iv:4s} {per:4s} 실패 {type(e).__name__}: {e}")
+
+print("\n".join(R))
+json.dump({"report":"\n".join(R)},open("probe_result.json","w"),ensure_ascii=False,indent=1)
