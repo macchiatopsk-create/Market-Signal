@@ -14,6 +14,36 @@ import json, math, datetime as dt, sys
 import yfinance as yf
 
 TICKERS = ("SPY", "QQQ")
+VIX_GATE_PCT = 20.0
+VIX_LOOKBACK = 252
+_VIXCACHE = {}
+
+
+def vix_dead_days():
+    """전날 종가 ^VIX9D/^VIX3M 백분위가 하위 VIX_GATE_PCT 미만인 날짜 집합.
+    shift(1) 로 미래참조 차단. 실패 시 빈 집합(게이트 미적용)."""
+    if "d" in _VIXCACHE: return _VIXCACHE["d"]
+    try:
+        import pandas as _pd
+        def _n(x):
+            try: x.index = x.index.tz_localize(None)
+            except (TypeError, AttributeError): pass
+            x.index = _pd.to_datetime(x.index).normalize()
+            return x[~x.index.duplicated(keep="last")]
+        a = _n(yf.Ticker("^VIX9D").history(period="2y")["Close"].dropna())
+        b = _n(yf.Ticker("^VIX3M").history(period="2y")["Close"].dropna())
+        ts = (a / b.reindex(a.index).ffill()).dropna()
+        def _p(w):
+            if len(w) < 2: return float("nan")
+            return float((w[:-1] < w[-1]).sum()) / (len(w) - 1) * 100
+        pct = ts.rolling(VIX_LOOKBACK).apply(_p, raw=True).shift(1)
+        dead = set(str(d.date()) for d in pct[pct < VIX_GATE_PCT].index)
+        known = set(str(d.date()) for d in pct.dropna().index)
+        _VIXCACHE["d"] = (dead, known)
+    except Exception as e:
+        print(f"  VIX 게이트 실패: {e}")
+        _VIXCACHE["d"] = (set(), set())
+    return _VIXCACHE["d"]
 K10 = 5                    # 원본과 동일: 6번째 봉(09:55)부터 진입 허용
 JUDGE_FROM = dt.time(10, 30)   # D 변형: 레짐 판정 시작
 FALLBACK   = dt.time(12, 0)    # D 변형: 미확정 timeout 판정 시점
@@ -77,7 +107,7 @@ def regime_path(T, H, L, C, vwap, sd):
     return None, 0
 
 
-def run(tk, variant):
+def run(tk, variant, vix_gate=False):
     df = yf.Ticker(tk).history(period="60d", interval="5m")
     if df is None or df.empty:
         return []
@@ -95,8 +125,13 @@ def run(tk, variant):
     use_regime = variant in ("D", "E", "F")
     thresh = {"E": 0.5, "F": 0.0}.get(variant, 1.0)   # 진입 임계 (σ)
 
+    dead, known = vix_dead_days() if vix_gate else (set(), set())
     days = sorted(set(df.index.date)); trades = []; prev_close = None
     for d in days:
+        if vix_gate and known and str(d) in dead:
+            day_ = df[df.index.date == d]
+            if len(day_): prev_close = float(day_["Close"].iloc[-1])
+            continue
         day = df[df.index.date == d]
         if len(day) < 60:
             if len(day): prev_close = float(day["Close"].iloc[-1])
@@ -199,17 +234,20 @@ def analyze(trades, tk, variant):
 if __name__ == "__main__":
     report = []; out = {}
     dump = {}
-    for variant in ("A", "B", "C", "D", "E", "F"):
+    combos = [(v, False) for v in ("A","B","C","D","E","F")] + \
+             [(v, True)  for v in ("B","C","D","E","F")]
+    for variant, gate in combos:
         for tk in TICKERS:
             try:
-                tr = run(tk, variant)
-                rep, data = analyze(tr, tk, variant)
+                tr = run(tk, variant, vix_gate=gate)
+                vname = variant + ("+VIX" if gate else "")
+                rep, data = analyze(tr, tk, vname)
                 report += rep
-                out.setdefault(variant, {})[tk] = data
-                dump.setdefault(variant, {})[tk] = tr
-                print(f"  {variant}/{tk} 완료: {len(tr)}건", flush=True)
+                out.setdefault(vname, {})[tk] = data
+                dump.setdefault(vname, {})[tk] = tr
+                print(f"  {vname}/{tk} 완료: {len(tr)}건", flush=True)
             except Exception as e:
-                msg = f"[{tk}/{variant}] 실패: {type(e).__name__}: {e}"
+                msg = f"[{tk}/{variant}{'+VIX' if gate else ''}] 실패: {type(e).__name__}: {e}"
                 report.append(msg); print("  " + msg, flush=True)
     txt = "\n".join(report)
     print(txt)
