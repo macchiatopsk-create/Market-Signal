@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: "실행할 스크립트 (all / v7 / v9 / v10 / vixts / premarket / credit)"
+        description: "실행할 스크립트 (all / v7 / v9 / v10 / vixts / premarket / credit / gapfill)"
         default: "all"
 permissions:
   contents: write
@@ -27,6 +27,7 @@ jobs:
             vixts)     run_one vixts_test.py; run_one vixts_confirm.py; run_one vixts_range.py ;;
             premarket) run_one premarket_test.py ;;
             credit)    run_one credit_test.py ;;
+            gapfill)   run_one gapfill_test.py ;;
             all)       for f in v9_test.py v10_test.py v7_backtest.py; do run_one $f; done ;;
           esac
       - name: persist
