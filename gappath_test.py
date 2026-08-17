@@ -16,7 +16,7 @@ import yfinance as yf
 import pandas as pd
 
 COVER_LO, COVER_HI = 0.5, 1.0     # 실전 구간 (1.0 이상은 이미 메워진 것에 가까움)
-CUT_BAR = 4                       # 09:30 첫봉 이후 4봉 = 14:30 까지
+# 컷오프는 인터벌별로 14:30 에 맞춰 계산
 
 
 def wilson(k, n):
@@ -58,8 +58,8 @@ def vix_map():
     return {str(pd.Timestamp(d).date()): float(v) for d, v in pct.dropna().items()}
 
 
-def build(tk):
-    df = yf.download(tk, period="2y", interval="1h", prepost=False,
+def build(tk, interval="1h", period="2y"):
+    df = yf.download(tk, period=period, interval=interval, prepost=False,
                      auto_adjust=False, progress=False)
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
@@ -70,9 +70,11 @@ def build(tk):
     rows = []; prev_close = None
     for d in sorted(set(df.index.date)):
         g = df[df.index.date == d]
-        if len(g) < 5:
+        need = {"5m": 40, "15m": 15, "1h": 5}[interval]
+        if len(g) < need:
             if len(g): prev_close = float(g["Close"].iloc[-1])
             continue
+        cut_bar = {"5m": 60, "15m": 20, "1h": 4}[interval]      # 14:30 상당
         O = [float(x) for x in g["Open"]]; H = [float(x) for x in g["High"]]
         L = [float(x) for x in g["Low"]];  C = [float(x) for x in g["Close"]]
         T = [t.strftime("%H:%M") for t in g.index]
@@ -95,16 +97,18 @@ def build(tk):
                         if (L[i] <= tgt) if sgn > 0 else (H[i] >= tgt): fill_bar = i
                     if fill_bar is not None: break
                 # 손익: TP=갭필 / SL=첫봉극점 / CUT_BAR 시간청산 (먼저 온 것)
-                if fill_bar is not None and (stop_bar is None or fill_bar <= stop_bar) and fill_bar <= CUT_BAR:
+                if fill_bar is not None and (stop_bar is None or fill_bar <= stop_bar) and fill_bar <= cut_bar:
                     pnl = abs(tgt - ep) / ep * 100 * (1 if True else 1); res = "FILL"
-                elif stop_bar is not None and stop_bar <= CUT_BAR:
+                elif stop_bar is not None and stop_bar <= cut_bar:
                     pnl = -abs(stop - ep) / ep * 100; res = "STOP"
                 else:
-                    idx = min(CUT_BAR, len(C) - 1)
+                    idx = min(cut_bar, len(C) - 1)
                     px = C[idx]
                     pnl = ((ep - px) / ep * 100) if sgn > 0 else ((px - ep) / ep * 100)
                     res = "CUT"
+                room = abs(tgt - ep) / ep * 100          # 진입가->갭필까지 남은 거리(%)
                 rows.append(dict(d=str(d), dir=sgn, gp=round(gp, 3), cover=round(cover, 3),
+                                 room=round(room, 3),
                                  mae=round(mae, 3), fill_bar=fill_bar, res=res,
                                  pnl=round(pnl, 4),
                                  fill_t=(T[fill_bar] if fill_bar is not None else None)))
@@ -132,16 +136,18 @@ def rep(rows, lab, out, ind="    "):
                f"평균 {sum(r['pnl'] for r in rows)/n:+.3f}% | 반반 {_pf([r for r in rows if r['d']<half]):.2f}/"
                f"{_pf([r for r in rows if r['d']>=half]):.2f} | MAE중앙 {sorted(r['mae'] for r in rows)[n//2]:.2f}% "
                f"최악 {max(r['mae'] for r in rows):.2f}% | 필봉중앙 {sorted(fb)[len(fb)//2] if fb else '-'} "
+               f"| 잔여갭중앙 {sorted(r['room'] for r in rows)[n//2]:.3f}% "
                f"| {'/'.join(f'{k}{v}' for k,v in sorted(rc.items()))}")
 
 
 def main():
     out = []
     vmap = vix_map()
-    out.append(f"VIX 맵 {len(vmap)}일 · 진입=첫봉(09:30~10:30) 종가 · TP=전날종가 · SL=첫봉극점 · 시간청산={CUT_BAR}봉(14:30)")
+    out.append(f"VIX 맵 {len(vmap)}일 · 진입=첫봉 종가 · TP=전날종가 · SL=첫봉극점 · 시간청산 14:30")
     for tk in ("QQQ", "SPY"):
-        rows = build(tk)
-        out.append(f"\n{'='*118}\n[{tk}] {len(rows)}일\n{'='*118}")
+      for iv, per in (("5m", "60d"), ("15m", "60d")):
+        rows = build(tk, iv, per)
+        out.append(f"\n{'='*118}\n[{tk}] 첫봉={iv} · {len(rows)}일\n{'='*118}")
         for sgn, nm in ((1, "갭업 → 풋(하락베팅)"), (-1, "갭다운 → 콜(상승베팅)")):
             ss = [r for r in rows if r["dir"] == sgn]
             out.append(f"  ── {nm} (n={len(ss)}) ──")
@@ -156,12 +162,12 @@ def main():
                     "커버≥0.5 & VIX≥50%", out)
                 rep([r for r in ss if r["cover"] >= COVER_LO and vmap.get(r["d"], -1) < 50],
                     "커버≥0.5 & VIX<50%", out)
-            # 갭필 시각 분포
-            fb = [r["fill_t"] for r in ss if r["cover"] >= COVER_LO and r["fill_t"]]
-            if fb:
-                cnt = {}
-                for t in fb: cnt[t] = cnt.get(t, 0) + 1
-                out.append("      갭필 시각 분포: " + " · ".join(f"{k} {v}건" for k, v in sorted(cnt.items())))
+            fbn = [r["fill_bar"] for r in ss if r["cover"] >= COVER_LO and r["fill_bar"] is not None]
+            if fbn:
+                fbn.sort()
+                mins = {"5m": 5, "15m": 15, "1h": 60}[iv]
+                out.append(f"      갭필 소요: 중앙 {fbn[len(fbn)//2]*mins}분 · "
+                           f"75%tile {fbn[int(len(fbn)*0.75)]*mins}분 · 최대 {fbn[-1]*mins}분")
     return out
 
 
