@@ -74,7 +74,7 @@ def build(tk):
 
 def rep(ss,lab,out):
     n=len(ss)
-    if n<8: out.append(f"    {lab:22s} n={n:3d} 표본부족"); return
+    if n<6: out.append(f"    {lab:22s} n={n:3d} 표본부족"); return
     t=[r for r in ss if r["res"]=="TGT"]
     w=sum(1 for r in ss if r["pnl"]>0); ci=wilson(w,n)
     g=sum(r["pnl"] for r in ss if r["pnl"]>0); l=-sum(r["pnl"] for r in ss if r["pnl"]<=0)
@@ -100,8 +100,11 @@ def main():
     prev={str(pd.Timestamp(d).date()):float(x) for d,x in closechg.shift(1).dropna().items()}
     out=[f"^VIX 맵 {len(same)}일 · 개장변화=전일종가→당일시가(09:30 확정) · 전일변화=전일 종가기준",
          "조건: 갭 & 첫1시간 커버>=30% · 진입 첫봉종가 · 타깃 전날종가 · 손절 당일극점 · 컷14:30"]
-    BINS=[(-99,-5,"≤-5%"),(-5,-2,"-5~-2%"),(-2,0,"-2~0%"),(0,2,"0~+2%"),(2,4,"+2~4%"),
-          (4,6,"+4~6%"),(6,9,"+6~9%"),(9,99,"≥+9%")]
+    BINS=[(-99,-4,"≤-4%"),(-4,-3,"-4~-3%"),(-3,-2,"-3~-2%"),(-2,-1,"-2~-1%"),
+          (-1,0,"-1~0%"),(0,1,"0~+1%"),(1,2,"+1~2%"),(2,3,"+2~3%"),
+          (3,4,"+3~4%"),(4,99,"≥+4%")]
+    CUM=[(-99,-2,"≤-2% (누적)"),(-99,-1,"≤-1% (누적)"),(-99,0,"<0% (누적)"),
+         (0,99,">=0% (누적)"),(1,99,">=+1% (누적)"),(2,99,">=+2% (누적)"),(3,99,">=+3% (누적)")]
     for tk in ("QQQ","SPY"):
         rows=build(tk)
         out.append(f"\n{'='*134}\n[{tk}] 조건충족 {len(rows)}일\n{'='*134}")
@@ -109,12 +112,12 @@ def main():
             ss=[r for r in rows if r["sgn"]==sgn]
             out.append(f"  ── {nm} (n={len(ss)}) ──")
             rep(ss,"전체",out)
-            out.append("   [당일 개장 VIX 변화율 · 09:30 확정 · 실전 신호]")
+            out.append("   [개장 VIX 변화율 · 1% 단위]")
             for lo,hi,lab in BINS:
                 rep([r for r in ss if lo<=same.get(r["d"],0)<hi],lab,out)
-            out.append("   [전일 VIX 종가 변화율 · 참고]")
-            for lo,hi,lab in BINS:
-                rep([r for r in ss if lo<=prev.get(r["d"],0)<hi],lab,out)
+            out.append("   [개장 VIX 변화율 · 누적 임계]")
+            for lo,hi,lab in CUM:
+                rep([r for r in ss if lo<=same.get(r["d"],0)<hi],lab,out)
     return out
 
 if __name__=="__main__":
