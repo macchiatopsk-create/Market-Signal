@@ -37,6 +37,7 @@ jobs:
             gapvix)    run_one gapvix_test.py ;;
             gapvixchg) run_one gapvixchg_test.py ;;
             gapvixopen) run_one gapvixopen_test.py ;;
+            gapcover)  run_one gapcover_test.py ;;
             all)       for f in v9_test.py v10_test.py v7_backtest.py; do run_one $f; done ;;
           esac
       - name: persist
