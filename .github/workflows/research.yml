@@ -52,6 +52,7 @@ jobs:
             symmetric) run_one symmetric.py ;;
             vixrate)   run_one vixrate.py ;;
             qqqvix)    run_one qqqvix.py ;;
+            gapafter)  run_one gapafter.py ;;
             gappull)   run_one gappull_test.py ;;
             all)       for f in v9_test.py v10_test.py v7_backtest.py; do run_one $f; done ;;
           esac
