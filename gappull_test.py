@@ -51,7 +51,12 @@ def load():
             if vx is None or abs(vx)<5.0:
                 gap=O[0]-pc; gp=gap/pc*100
                 if 0.2<=gp<1.5:                 # 갭업만
-                    days.append(dict(d=ds,gp=gp,pc=pc,O=O,H=H,L=L,C=C,V=V,T=T))
+                    gapabs=O[0]-pc
+                    cov5=(O[0]-C[0])/gapabs                       # 첫 5분봉 커버
+                    cov15=(O[0]-C[2])/gapabs if len(C)>2 else cov5 # 첫 15분 커버
+                    cov60=(O[0]-C[11])/gapabs if len(C)>11 else cov15
+                    days.append(dict(d=ds,gp=gp,pc=pc,O=O,H=H,L=L,C=C,V=V,T=T,
+                                     cov5=cov5,cov15=cov15,cov60=cov60))
         pc=C[-1]
     return days
 
@@ -120,9 +125,20 @@ def main():
     days=load()
     out=[f"QQQ 갭업 0.2~1.5% · 5분봉 60일 · {len(days)}일",
          "손절=진입시점 당일고점+갭30% · 타깃=전날종가 · 컷 14:00",""]
-    for mode in ("IMM","R30","R50","R70","VWU","HOD"):
-        res=[x for x in (sim(d,mode) for d in days) if x]
-        rep(res,mode,len(days),out)
+    filters=[("필터없음",       lambda d: True),
+             ("5분커버>=30%",   lambda d: d["cov5"]>=0.30),
+             ("15분커버>=30%",  lambda d: d["cov15"]>=0.30),
+             ("60분커버>=30%",  lambda d: d["cov60"]>=0.30),
+             ("15분커버>=50%",  lambda d: d["cov15"]>=0.50)]
+    for fl,fn in filters:
+        sel=[d for d in days if fn(d)]
+        out.append(f"── {fl} ({len(sel)}일) ──")
+        if len(sel)<6:
+            out.append("   표본부족\n"); continue
+        for mode in ("IMM","R50","R70","VWU","HOD"):
+            res=[x for x in (sim(d,mode) for d in sel) if x]
+            rep(res,mode,len(sel),out)
+        out.append("")
     return out
 
 if __name__=="__main__":
