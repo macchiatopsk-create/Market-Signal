@@ -55,6 +55,7 @@ jobs:
             gapafter)  run_one gapafter.py ;;
             gapfull)   run_one gapfull.py ;;
             covthresh) run_one covthresh.py ;;
+            entry3)    run_one entry3.py ;;
             gappull)   run_one gappull_test.py ;;
             all)       for f in v9_test.py v10_test.py v7_backtest.py; do run_one $f; done ;;
           esac
