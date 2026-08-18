@@ -18,7 +18,7 @@ import yfinance as yf
 import pandas as pd
 
 COVER_MIN = 0.30
-START_CAP = 1000.0
+START_CAP = 5000.0
 SPECS = {  # 신호티커: (선물명, 지수티커, 틱당달러, 포인트당달러, 왕복수수료, 슬리피지틱)
     "QQQ": ("MNQ", "^NDX",  0.50, 2.0, 1.24, 1),
     "SPY": ("MES", "^GSPC", 1.25, 5.0, 1.24, 1),
@@ -76,7 +76,7 @@ def trades_for(tk):
     return out
 
 
-def simulate(tk, trs, idx_close, days=252):
+def simulate(tk, trs, idx_close, days=252, contracts=1, margin=None):
     name, itk, tickusd, ptusd, comm, sliptick = SPECS[tk]
     trs = [t for t in trs if t["d"] >= str(dt.date.today() - dt.timedelta(days=int(days*1.45)))]
     cap = START_CAP; peak = cap; mdd = 0.0; curve = []; rows = []
@@ -84,15 +84,19 @@ def simulate(tk, trs, idx_close, days=252):
     for t in trs:
         lvl = idx_close.get(t["d"])
         if lvl is None: continue
+        nc = contracts
+        if margin:                                   # 자본 비례: 마진 기준 계약 수
+            nc = max(0, int(cap // margin))
+            if nc == 0: continue
         pts = t["pct"] / 100 * lvl                  # 지수 포인트 이동
-        gross = pts * ptusd
-        cost = comm + 2 * sliptick * tickusd        # 왕복 수수료 + 진입·청산 슬리피지
+        gross = pts * ptusd * nc
+        cost = (comm + 2 * sliptick * tickusd) * nc
         net = gross - cost
         cap += net
         peak = max(peak, cap); mdd = max(mdd, (peak - cap) / peak * 100)
         if net > 0: wins += 1
         curve.append(cap)
-        rows.append(dict(d=t["d"], res=t["res"], pct=round(t["pct"], 3),
+        rows.append(dict(d=t["d"], res=t["res"], nc=nc, pct=round(t["pct"], 3),
                          pts=round(pts, 1), net=round(net, 2), cap=round(cap, 2)))
         if cap <= 0: break
     n = len(rows)
@@ -112,9 +116,13 @@ def main():
         idx = _n(yf.Ticker(itk).history(period="2y")["Close"].dropna())
         idx_close = {str(d.date()): float(v) for d, v in idx.items()}
         trs = trades_for(tk)
-        r = simulate(tk, trs, idx_close)
-        if not r:
+        MARGIN = {"MNQ": 2500.0, "MES": 2500.0}[name]   # 보수적 데이마진 가정
+        scen = [("1계약 고정", dict(contracts=1)),
+                (f"자본비례(마진 ${MARGIN:.0f}/계약)", dict(margin=MARGIN))]
+        base = simulate(tk, trs, idx_close, **scen[0][1])
+        if not base:
             out.append(f"[{tk}] 트레이드 없음"); continue
+        r = base
         cost = comm + 2*sliptick*tickusd
         out.append(f"\n{'='*104}\n[{tk} 신호 → {name} 선물] 최근 1년 · 1계약 · 자본 ${START_CAP:.0f} 시작"
                    f"\n지수 {itk} · 1pt=${ptusd} · 왕복비용 ${cost:.2f}\n{'='*104}")
@@ -125,6 +133,10 @@ def main():
         out.append(f"  최대낙폭(MDD) {r['mdd']}%")
         out.append(f"  ※ 명목가치 = 지수 × ${ptusd} ≈ ${idx.iloc[-1]*ptusd:,.0f} → 자본 대비 레버리지 "
                    f"{idx.iloc[-1]*ptusd/START_CAP:.0f}배")
+        r2 = simulate(tk, trs, idx_close, **scen[1][1])
+        if r2:
+            out.append(f"  [{scen[1][0]}] 최종 ${r2['cap']:,.0f} ({(r2['cap']/START_CAP-1)*100:+.0f}%) "
+                       f"· MDD {r2['mdd']}% · 최대손실 ${r2['worst']:+,.0f} · 최종계약수 {r2['rows'][-1]['nc']}")
         # 손실 상위 5건
         worst5 = sorted(r["rows"], key=lambda x: x["net"])[:5]
         out.append("  손실 상위 5건: " + " · ".join(f"{w['d'][5:]} {w['res']} ${w['net']:+,.0f}" for w in worst5))
