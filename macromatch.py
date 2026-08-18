@@ -38,9 +38,16 @@ def main():
             cols[nm]=(d["Open"]/d["Close"].shift(1)-1)*100
         except Exception as e:
             out.append(f"  {nm} 수집 실패")
-    F=pd.DataFrame(cols).dropna()
-    # z-score 정규화 (지표별 변동성 차이 제거)
-    Z=(F-F.mean())/F.std()
+    F=pd.DataFrame(cols)
+    # 커버리지 진단 후, 결측 많은 피처 제외 + 나머지는 0(변화없음)으로 채움
+    cov=F.notna().mean()
+    out.append("피처 커버리지: " + " · ".join(f"{c} {cov[c]*100:.0f}%" for c in F.columns))
+    keep=[c for c in F.columns if cov[c]>=0.90]
+    out.append(f"사용 피처 {len(keep)}개 (커버리지 90%+): {', '.join(keep)}")
+    dropped=[c for c in F.columns if c not in keep]
+    if dropped: out.append(f"제외: {', '.join(dropped)}")
+    F=F[keep]
+    Z=((F-F.mean())/F.std()).fillna(0.0)     # 개별 결측만 0 처리, 행은 유지
 
     # 2) 타깃: QQQ 당일 09:30->종가, 장중 저점/고점
     q=norm(yf.Ticker("QQQ").history(period="2y")[["Open","High","Low","Close"]].dropna())
@@ -50,7 +57,8 @@ def main():
         "hi":(q["High"]/q["Open"]-1)*100,
         "gap":(q["Open"]/q["Close"].shift(1)-1)*100,
     }).dropna()
-    df=Z.join(tgt,how="inner").dropna()
+    df=Z.join(tgt,how="inner")
+    df=df.dropna(subset=["ret","lo","hi","gap"])
     if len(df)<100: return out+[f"표본 부족 {len(df)}"]
 
     feat_cols=[c for c in Z.columns if c in df.columns]
