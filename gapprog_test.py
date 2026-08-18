@@ -32,7 +32,7 @@ def vmap_open():
         time.sleep(5*(2**i))
     return {}
 
-def build(tk,vm):
+def build(tk,vm,cov_lo=0.30):
     df=yf.download(tk,period="2y",interval="1h",prepost=False,auto_adjust=False,progress=False)
     if isinstance(df.columns,pd.MultiIndex): df.columns=df.columns.get_level_values(0)
     df=df.dropna(); df.index=df.index.tz_convert("America/New_York")
@@ -53,7 +53,7 @@ def build(tk,vm):
             if abs(gp)>=0.05:
                 sgn=1 if gap>0 else -1
                 cover=((O[0]-C[0])/gap) if sgn>0 else ((C[0]-O[0])/abs(gap))
-                if 0.30<=cover<1.00:                       # 상한으로 동어반복 제거
+                if cov_lo<=cover<1.00:                       # 상한으로 동어반복 제거
                     ep=C[0]; tgt=pc
                     room=abs(tgt-ep)                        # 남은 거리(절대)
                     if room<=0: pc=C[-1]; continue
@@ -84,23 +84,19 @@ def rep(ss,lab,out):
 
 def main():
     vm=vmap_open()
-    out=["커버 0.30~1.00 (이미 메운 날 제외) · 진입 첫봉종가 · 14:30까지",
-         "진행률 = 남은갭(진입가→전날종가) 대비 최대 진행 %. 100% = 완전 갭필"]
+    out=["커버 하한별 x 갭 크기별 · 커버 상한 1.00 고정(이미 메운 날 제외)",
+         "진행률 = 남은갭 대비 최대 진행 %. 타깃을 50%/70%로 잡았을 때의 도달률"]
     for tk in ("QQQ","SPY"):
-        rows=build(tk,vm)
-        out.append(f"\n{'='*126}\n[{tk}] 조건충족 {len(rows)}일\n{'='*126}")
+        cache={c:build(tk,vm,c) for c in (0.10,0.15,0.20,0.25,0.30)}
+        out.append(f"\n{'='*128}\n[{tk}]\n{'='*128}")
         for sgn,nm in ((1,"갭업→숏"),(-1,"갭다운→롱")):
-            ss=[r for r in rows if r["sgn"]==sgn]
-            out.append(f"  ── {nm} (n={len(ss)}) ──")
-            rep(ss,"전체",out)
-            out.append("   [남은 갭 거리별]")
-            for lo,hi,lab in ((0,0.15,"~0.15%"),(0.15,0.3,"0.15~0.3%"),
-                              (0.3,0.5,"0.3~0.5%"),(0.5,99,"0.5%+")):
-                rep([r for r in ss if lo<=r["room_pct"]<hi],lab,out)
-            out.append("   [원래 갭 크기별]")
-            for lo,hi,lab in ((0,0.3,"갭 ~0.3%"),(0.3,0.6,"갭 0.3~0.6%"),
-                              (0.6,1.0,"갭 0.6~1.0%"),(1.0,99,"갭 1.0%+")):
-                rep([r for r in ss if lo<=r["gp"]<hi],lab,out)
+            out.append(f"  ══ {nm} ══")
+            for gl,gh,glab in ((0.3,0.6,"갭 0.3~0.6%"),(0.6,1.0,"갭 0.6~1.0%"),
+                               (0.3,1.0,"갭 0.3~1.0% (통합)"),(0.5,1.2,"갭 0.5~1.2%")):
+                out.append(f"   ── {glab} ──")
+                for c in (0.10,0.15,0.20,0.25,0.30):
+                    ss=[r for r in cache[c] if r["sgn"]==sgn and gl<=r["gp"]<gh]
+                    rep(ss,f"커버≥{c:.2f}",out)
     return out
 
 if __name__=="__main__":
