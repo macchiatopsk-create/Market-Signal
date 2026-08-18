@@ -41,6 +41,7 @@ jobs:
             gapdays)   run_one gapdays_test.py ;;
             gapprog)   run_one gapprog_test.py ;;
             gapentry)  run_one gapentry_test.py ;;
+            gaplist)   run_one gaplist.py ;;
             all)       for f in v9_test.py v10_test.py v7_backtest.py; do run_one $f; done ;;
           esac
       - name: persist
