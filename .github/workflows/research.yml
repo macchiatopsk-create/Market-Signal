@@ -50,6 +50,7 @@ jobs:
             killswitch) run_one killswitch.py ;;
             single)    run_one single.py ;;
             symmetric) run_one symmetric.py ;;
+            vixrate)   run_one vixrate.py ;;
             gappull)   run_one gappull_test.py ;;
             all)       for f in v9_test.py v10_test.py v7_backtest.py; do run_one $f; done ;;
           esac
