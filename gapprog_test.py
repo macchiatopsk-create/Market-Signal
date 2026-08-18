@@ -72,7 +72,7 @@ def build(tk,vm,cov_lo=0.30):
 
 def rep(ss,lab,out):
     n=len(ss)
-    if n<6: out.append(f"    {lab:20s} n={n:3d} 표본부족"); return
+    if n<8: out.append(f"    {lab:20s} n={n:3d} 표본부족"); return
     p50=sum(1 for r in ss if r["prog"]>=50); p70=sum(1 for r in ss if r["prog"]>=70)
     p100=sum(1 for r in ss if r["prog"]>=100)
     c50,c70,c100=wilson(p50,n),wilson(p70,n),wilson(p100,n)
@@ -87,14 +87,15 @@ def main():
     out=["커버 하한별 x 갭 크기별 · 커버 상한 1.00 고정(이미 메운 날 제외)",
          "진행률 = 남은갭 대비 최대 진행 %. 타깃을 50%/70%로 잡았을 때의 도달률"]
     for tk in ("QQQ","SPY"):
-        cache={c:build(tk,vm,c) for c in (0.10,0.15,0.20,0.25,0.30)}
+        cache={c:build(tk,vm,c) for c in (0.0,0.05,0.10,0.20,0.30)}
         out.append(f"\n{'='*128}\n[{tk}]\n{'='*128}")
         for sgn,nm in ((1,"갭업→숏"),(-1,"갭다운→롱")):
             out.append(f"  ══ {nm} ══")
-            for gl,gh,glab in ((0.3,0.6,"갭 0.3~0.6%"),(0.6,1.0,"갭 0.6~1.0%"),
-                               (0.3,1.0,"갭 0.3~1.0% (통합)"),(0.5,1.2,"갭 0.5~1.2%")):
+            for gl,gh,glab in ((0.05,99,"갭 전체"),(0.2,99,"갭 0.2%+"),
+                               (0.3,99,"갭 0.3%+"),(0.2,1.0,"갭 0.2~1.0%"),
+                               (0.3,1.0,"갭 0.3~1.0%")):
                 out.append(f"   ── {glab} ──")
-                for c in (0.10,0.15,0.20,0.25,0.30):
+                for c in (0.0,0.05,0.10,0.20,0.30):
                     ss=[r for r in cache[c] if r["sgn"]==sgn and gl<=r["gp"]<gh]
                     rep(ss,f"커버≥{c:.2f}",out)
     return out
