@@ -94,11 +94,13 @@ def sim(day,mode):
     O,H,L,C,T=day["O"],day["H"],day["L"],day["C"],day["T"]
     gap=O[0]-day["pc"]; tgt=day["pc"]
     stop=max(H[:i+1])+gap*0.3
+    room=(ep-tgt)/ep*100          # 진입가에서 타깃까지 거리
+    srisk=(stop-ep)/ep*100        # 진입가에서 손절까지 거리
     for j in range(i+1,len(C)):
-        if H[j]>=stop: return dict(d=day["d"],res="STOP",ux=-(stop-ep)/ep*100,hold=(j-i)*5)
-        if L[j]<=tgt:  return dict(d=day["d"],res="TGT", ux=(ep-tgt)/ep*100,hold=(j-i)*5)
-        if T[j]>=CUT:  return dict(d=day["d"],res="CUT", ux=(ep-C[j])/ep*100,hold=(j-i)*5)
-    return dict(d=day["d"],res="EOD",ux=(ep-C[-1])/ep*100,hold=(len(C)-1-i)*5)
+        if H[j]>=stop: return dict(d=day["d"],res="STOP",ux=-(stop-ep)/ep*100,hold=(j-i)*5,room=room,srisk=srisk,ep=ep,ei=i)
+        if L[j]<=tgt:  return dict(d=day["d"],res="TGT", ux=room,hold=(j-i)*5,room=room,srisk=srisk,ep=ep,ei=i)
+        if T[j]>=CUT:  return dict(d=day["d"],res="CUT", ux=(ep-C[j])/ep*100,hold=(j-i)*5,room=room,srisk=srisk,ep=ep,ei=i)
+    return dict(d=day["d"],res="EOD",ux=(ep-C[-1])/ep*100,hold=(len(C)-1-i)*5,room=room,srisk=srisk,ep=ep,ei=i)
 
 def rep(res,lab,tot,out):
     n=len(res)
@@ -107,10 +109,12 @@ def rep(res,lab,tot,out):
     g=sum(x["ux"] for x in res if x["ux"]>0); l=-sum(x["ux"] for x in res if x["ux"]<=0)
     rc={}
     for x in res: rc[x["res"]]=rc.get(x["res"],0)+1
-    out.append(f"  {lab:6s} n={n:3d}/{tot} 진입률 {n/tot*100:5.1f}% | 승률 {w/n*100:5.1f}%({ci[0]:.0f}~{ci[1]:.0f}) "
-               f"PF {g/l if l else 99:5.2f} | 평균 {sum(x['ux'] for x in res)/n:+.3f}% "
-               f"이익평균 {(g/w if w else 0):+.3f}% 손실평균 {-(l/(n-w) if n-w else 0):+.3f}% "
-               f"| 보유 {sum(x['hold'] for x in res)/n:3.0f}분 | {'/'.join(f'{k}{v}' for k,v in sorted(rc.items()))}")
+    room=sum(x["room"] for x in res)/n; sr=sum(x["srisk"] for x in res)/n
+    out.append(f"  {lab:6s} n={n:3d}/{tot} 진입 {sum(x['ei'] for x in res)/n*5:4.0f}분후 "
+               f"| 타깃거리 {room:.3f}% 손절폭 {sr:.3f}% RR {room/sr if sr else 0:4.2f} "
+               f"| 승률 {w/n*100:5.1f}%({ci[0]:.0f}~{ci[1]:.0f}) PF {g/l if l else 99:5.2f} "
+               f"평균 {sum(x['ux'] for x in res)/n:+.3f}% | 이익 {(g/w if w else 0):+.3f}% "
+               f"손실 {-(l/(n-w) if n-w else 0):+.3f}% | {'/'.join(f'{k}{v}' for k,v in sorted(rc.items()))}")
 
 def main():
     days=load()
