@@ -65,7 +65,9 @@ def run(tk, interval, period, stop_mode="extreme"):
                         return (((ep-C[idx])/ep*100) if sgn>0 else ((C[idx]-ep)/ep*100)),"CUT"
                     st0=(max(H[:nb]) if sgn>0 else min(L[:nb]))
                     p0,r0=sim(ep0,nb-1,st0)
-                    base.append(dict(d=str(d),sgn=sgn,pnl=p0,res=r0))
+                    base.append(dict(d=str(d),sgn=sgn,pnl=p0,res=r0,
+                                     room=abs(tgt-ep0)/ep0*100,
+                                     srisk=abs(st0-ep0)/ep0*100))
                     # (b) VWAP 밴드 터치 대기
                     ei=None
                     for i in range(nb,min(cut+1,len(C))):
@@ -73,10 +75,18 @@ def run(tk, interval, period, stop_mode="extreme"):
                         if (H[i]>=W[i]+S[i]) if sgn>0 else (L[i]<=W[i]-S[i]):
                             ei=i; ep=(W[i]+S[i]) if sgn>0 else (W[i]-S[i]); break
                     if ei is not None:
-                        stop=(max(H[:ei+1]) if sgn>0 else min(L[:ei+1])) if stop_mode=="extreme" \
-                             else ((W[ei]+2*S[ei]) if sgn>0 else (W[ei]-2*S[ei]))
+                        if stop_mode=="extreme":
+                            stop=(max(H[:ei+1]) if sgn>0 else min(L[:ei+1]))
+                        elif stop_mode=="2sigma":
+                            stop=((W[ei]+2*S[ei]) if sgn>0 else (W[ei]-2*S[ei]))
+                        elif stop_mode=="open":          # 당일 시가 = 갭 지속 확정선
+                            stop=O[0]
+                        else:                            # 고정 0.5%
+                            stop=ep*(1+sgn*0.005)
                         p1,r1=sim(ep,ei,stop)
-                        vw.append(dict(d=str(d),sgn=sgn,pnl=p1,res=r1,bar=ei))
+                        vw.append(dict(d=str(d),sgn=sgn,pnl=p1,res=r1,bar=ei,
+                                       room=abs(tgt-ep)/ep*100,
+                                       srisk=abs(stop-ep)/ep*100))
         pc=C[-1]
     return base,vw
 
@@ -93,28 +103,29 @@ def rep(ss,lab,out):
         return (a/b) if b>0 else 99.0
     rc={}
     for r in ss: rc[r["res"]]=rc.get(r["res"],0)+1
-    out.append(f"    {lab:30s} n={n:3d} 승률 {w/n*100:5.1f}% CI({ci[0]:4.1f}~{ci[1]:4.1f}) "
-               f"PF {g/l if l else 99:5.2f} |상위2제외 {g2/l2 if l2 else 99:5.2f} "
-               f"평균 {sum(r['pnl'] for r in ss)/n:+.3f}% | 반반 {_pf([r for r in ss if r['d']<half]):5.2f}/"
-               f"{_pf([r for r in ss if r['d']>=half]):5.2f} | {'/'.join(f'{k}{v}' for k,v in sorted(rc.items()))}")
+    room=sum(r.get("room",0) for r in ss)/n
+    sr=sum(r.get("srisk",0) for r in ss)/n
+    tgtn=rc.get("TGT",0)
+    out.append(f"    {lab:26s} n={n:3d} 타깃거리 {room:.3f}% 손절폭 {sr:.3f}% RR {room/sr if sr else 0:4.2f} "
+               f"| 도달 {tgtn/n*100:5.1f}% 승률 {w/n*100:5.1f}% PF {g/l if l else 99:5.2f} "
+               f"|상위2 {g2/l2 if l2 else 99:5.2f} 평균 {sum(r['pnl'] for r in ss)/n:+.3f}% "
+               f"| 반반 {_pf([r for r in ss if r['d']<half]):5.2f}/{_pf([r for r in ss if r['d']>=half]):5.2f} "
+               f"| {'/'.join(f'{k}{v}' for k,v in sorted(rc.items()))}")
 
 def main():
     out=["갭 + 첫1시간 커버>=30% 구간에서, VWAP 밴드 터치를 진입 타이밍으로 쓰면?",
          "타깃=전날종가(갭필) · 컷 14:30"]
     for tk in ("QQQ","SPY"):
-        for iv,per in (("1h","2y"),("15m","60d")):
-            for sm in ("extreme","2sigma"):
-                b,v=run(tk,iv,per,sm)
-                if sm=="extreme":
-                    out.append(f"\n{'='*112}\n[{tk}] {iv} {per} · 조건충족 {len(b)}일 · VWAP밴드 터치 {len(v)}일 "
-                               f"({len(v)/max(1,len(b))*100:.0f}%)\n{'='*112}")
-                    for sgn,nm in ((1,"갭업→숏"),(-1,"갭다운→롱")):
-                        out.append(f"  ── {nm} ──")
-                        rep([r for r in b if r["sgn"]==sgn],"첫봉종가 즉시진입(비교군)",out)
-                        rep([r for r in v if r["sgn"]==sgn],"VWAP밴드 터치 · 손절=극점",out)
-                else:
-                    for sgn,nm in ((1,"갭업→숏"),(-1,"갭다운→롱")):
-                        rep([r for r in v if r["sgn"]==sgn],f"VWAP밴드 터치 · 손절=2σ ({nm})",out)
+        res={}
+        for sm in ("extreme","2sigma","open","fixed"):
+            res[sm]=run(tk,"1h","2y",sm)
+        b=res["extreme"][0]
+        out.append(f"\n{'='*126}\n[{tk}] 1h 2y · 조건충족 {len(b)}일 · VWAP밴드 터치 {len(res['extreme'][1])}일\n{'='*126}")
+        for sgn,nm in ((1,"갭업→숏"),(-1,"갭다운→롱")):
+            out.append(f"  ── {nm} ──")
+            rep([r for r in b if r["sgn"]==sgn],"첫봉종가 즉시(비교군)",out)
+            for sm,smn in (("extreme","당일극점"),("2sigma","+2σ"),("open","당일시가"),("fixed","고정0.5%")):
+                rep([r for r in res[sm][1] if r["sgn"]==sgn],f"VWAP터치·손절 {smn}",out)
     return out
 
 if __name__=="__main__":
