@@ -48,6 +48,7 @@ jobs:
             macromatch) run_one macromatch.py ;;
             augmatch)  run_one augmatch.py ;;
             killswitch) run_one killswitch.py ;;
+            single)    run_one single.py ;;
             gappull)   run_one gappull_test.py ;;
             all)       for f in v9_test.py v10_test.py v7_backtest.py; do run_one $f; done ;;
           esac
