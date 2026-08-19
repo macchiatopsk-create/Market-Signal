@@ -55,6 +55,7 @@ jobs:
             gapafter)  run_one gapafter.py ;;
             gapfull)   run_one gapfull.py ;;
             covthresh) run_one covthresh.py ;;
+            covexec)   run_one covexec.py ;;
             entry3)    run_one entry3.py ;;
             sizing)    run_one sizing.py ;;
             worstdays) run_one worstdays.py ;;
