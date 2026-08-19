@@ -167,21 +167,23 @@ def main():
                    f"{'/'.join(f'{k}{v}' for k,v in sorted(rc.items()))}")
         if best is None or pf>best[1]: best=(lab,pf,ts)
     out.append("")
-    out.append("[시간컷 비교 · 트레일 0.15% 손절O]")
-    out.append(f"  {'시간컷':10s} {'승률':>6s} {'PF':>6s} {'계약당':>9s} {'기초평균':>9s} {'보유h':>6s}  구성")
-    for ch,cl in ((dt.time(11,0),"11:00"),(dt.time(11,30),"11:30"),(dt.time(12,0),"12:00"),
-                  (dt.time(13,0),"13:00"),(dt.time(14,0),"14:00"),(dt.time(14,30),"14:30"),
-                  (dt.time(15,55),"종가")):
-        ts2=build(raw,0.15,True,"trail",ch)
-        o2=[to_opt(t) for t in ts2]
-        w2=sum(1 for _,u in o2 if u>0)
-        g2=sum(u for _,u in o2 if u>0); l2=-sum(u for _,u in o2 if u<=0)
-        rc2={}
-        for t in ts2: rc2[t["res"]]=rc2.get(t["res"],0)+1
-        out.append(f"  {cl:10s} {w2/len(ts2)*100:5.1f}% {g2/l2 if l2 else 99:6.2f} "
-                   f"${np.mean([u for _,u in o2]):+8.2f} {np.mean([t['ux'] for t in ts2]):+8.3f}% "
-                   f"{np.mean([t['hold'] for t in ts2]):5.1f}  "
-                   f"{'/'.join(f'{k}{v}' for k,v in sorted(rc2.items()))}")
+    out.append("[트레일 폭 × 시간컷 교차 · 손절 유지]")
+    for tr in (0.5, 0.75, 1.0, 1.5, 2.0, None):
+        lab = f"트레일 {tr}%" if tr else "트레일 없음(홀드)"
+        out.append(f"  ── {lab} ──")
+        out.append(f"    {'시간컷':8s} {'승률':>6s} {'PF':>6s} {'계약당':>9s} {'기초':>8s} {'보유h':>5s}  구성")
+        for ch,cl in ((dt.time(11,0),"11:00"),(dt.time(12,0),"12:00"),(dt.time(13,0),"13:00"),
+                      (dt.time(14,0),"14:00"),(dt.time(14,30),"14:30"),(dt.time(15,55),"종가")):
+            ts2=build(raw, tr if tr else 99.0, True, "trail", ch)
+            o2=[to_opt(t) for t in ts2]
+            w2=sum(1 for _,u in o2 if u>0)
+            g2=sum(u for _,u in o2 if u>0); l2=-sum(u for _,u in o2 if u<=0)
+            rc2={}
+            for t in ts2: rc2[t["res"]]=rc2.get(t["res"],0)+1
+            out.append(f"    {cl:8s} {w2/len(ts2)*100:5.1f}% {g2/l2 if l2 else 99:6.2f} "
+                       f"${np.mean([u for _,u in o2]):+8.2f} {np.mean([t['ux'] for t in ts2]):+7.3f}% "
+                       f"{np.mean([t['hold'] for t in ts2]):4.1f}  "
+                       f"{'/'.join(f'{k}{v}' for k,v in sorted(rc2.items()))}")
     out.append("")
     out.append(f"[최적 방식: {best[0]}] 사이징 비교")
     ts=best[2]
