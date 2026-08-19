@@ -57,6 +57,7 @@ jobs:
             covthresh) run_one covthresh.py ;;
             covexec)   run_one covexec.py ;;
             baserate)  run_one baserate.py ;;
+            basesweep) run_one basesweep.py ;;
             entry3)    run_one entry3.py ;;
             sizing)    run_one sizing.py ;;
             worstdays) run_one worstdays.py ;;
