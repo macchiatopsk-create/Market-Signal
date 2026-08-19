@@ -78,38 +78,46 @@ def run(cut_h, only_unfilled):
     return out
 
 def sim(ts,frac=0.30,cap0=2000.0):
-    cap=cap0;peak=cap;mdd=0.0
+    cap=cap0;peak=cap;mdd=0.0;pcts=[];ncs=[];streak=0;mx=0
     for t in ts:
         cost=t["prem"]*100
         nc=max(int((cap*frac)//cost),0)
         if nc<1: continue
+        before=cap
         cap+=t["usd"]*nc
+        pcts.append(t["usd"]*nc/before*100); ncs.append(nc)
+        if t["usd"]<0:
+            streak+=1; mx=max(mx,streak)
+        else: streak=0
         peak=max(peak,cap);mdd=max(mdd,(peak-cap)/peak*100)
         if cap<=0: break
-    return cap,mdd
+    return dict(cap=cap,mdd=mdd,worst=min(pcts) if pcts else 0,
+                maxstreak=mx,med_nc=np.median(ncs) if ncs else 0,
+                max_nc=max(ncs) if ncs else 0,last_nc=ncs[-1] if ncs else 0)
 
 def main():
-    out=["갭 0.2~1.5% & 커버40%+ · 가격손절 없음 · 갭필후 트레일0.15% · 옵션 델타0.69",
-         "사이징 자본 30% · $2,000 시작",""]
-    for only in (True,False):
-        lab="갭필 전에만 시간컷" if only else "갭필 여부 무관 시간컷"
-        out.append(f"━━ {lab} ━━")
-        out.append(f"  {'시간컷':10s} {'n':>3s} {'승률':>16s} {'PF':>6s} {'평균%':>7s} "
-                   f"{'대손실':>6s} {'최종자본':>11s} {'MDD':>6s}  청산구성")
-        for ch,cl in ((dt.time(11,30),"11:30"),(dt.time(12,30),"12:30"),(dt.time(13,30),"13:30"),
-                      (dt.time(14,0),"14:00"),(dt.time(15,0),"15:00"),(None,"없음")):
-            ts=run(ch,only)
-            n=len(ts); w=sum(1 for t in ts if t["usd"]>0)
-            g=sum(t["usd"] for t in ts if t["usd"]>0); l=-sum(t["usd"] for t in ts if t["usd"]<=0)
-            big=sum(1 for t in ts if t["pct"]<=-50)
-            cap,mdd=sim(ts); ci=wilson(w,n)
-            rc={}
-            for t in ts: rc[t["res"]]=rc.get(t["res"],0)+1
-            out.append(f"  {cl:10s} {n:3d} {w/n*100:5.1f}%({ci[0]:4.1f}~{ci[1]:4.1f}) "
-                       f"{g/l if l else 99:6.2f} {np.mean([t['pct'] for t in ts]):+6.1f}% "
-                       f"{big:5d}건 ${cap:10,.0f} {mdd:5.1f}%  "
-                       f"{'/'.join(f'{k}{v}' for k,v in sorted(rc.items()))}")
-        out.append("")
+    ts=run(dt.time(11,30),True)
+    n=len(ts); w=sum(1 for t in ts if t["usd"]>0)
+    g=sum(t["usd"] for t in ts if t["usd"]>0); l=-sum(t["usd"] for t in ts if t["usd"]<=0)
+    big=sum(1 for t in ts if t["pct"]<=-50)
+    out=["갭 0.2~1.5% & 커버40%+ · 가격손절 없음 · 11:30까지 갭필 실패시 청산",
+         "갭필 후 트레일0.15% · 옵션 ITM 델타0.69 · $2,000 시작",
+         f"거래 {n}건(연 {n/2:.0f}회) · 승률 {w/n*100:.1f}% · PF {g/l:.2f} · "
+         f"계약당 평균 ${np.mean([t['usd'] for t in ts]):+.2f} · 대손실(-50%↓) {big}건",""]
+    out.append(f"  {'사이징':12s} {'최종자본':>12s} {'수익률':>9s} {'MDD':>7s} {'최악1회':>7s} "
+               f"{'최장연패':>7s} {'중앙계약':>8s} {'최대계약':>8s} {'마지막':>7s}")
+    for frac in (0.10,0.20,0.30,0.40,0.50,0.60,0.70,0.80,0.90,1.00):
+        r=sim(ts,frac)
+        out.append(f"  자본 {frac*100:3.0f}%    ${r['cap']:11,.0f} {(r['cap']/2000-1)*100:+8.0f}% "
+                   f"{r['mdd']:6.1f}% {r['worst']:6.1f}% {r['maxstreak']:7d} "
+                   f"{r['med_nc']:8.0f} {r['max_nc']:8d} {r['last_nc']:7d}")
+    out.append("")
+    r1=sim(ts,0.0001)
+    out.append("[참고] 고정 1계약 기준")
+    cap=2000.0;peak=cap;mdd=0.0
+    for t in ts:
+        cap+=t["usd"]; peak=max(peak,cap); mdd=max(mdd,(peak-cap)/peak*100)
+    out.append(f"  고정 1계약    ${cap:11,.0f} {(cap/2000-1)*100:+8.0f}% {mdd:6.1f}%")
     return out
 
 if __name__=="__main__":
