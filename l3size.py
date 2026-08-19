@@ -78,7 +78,7 @@ def trades():
                         vix=vlv.get(ds,16.0)))
     return out
 
-def exitsim(r, trail, use_stop, mode="trail"):
+def exitsim(r, trail, use_stop, mode="trail", cut=dt.time(14,30)):
     """mode: trail=트레일링만 / tp1=기존 분할청산"""
     ei,ep=r["ei"],r["ep"]; H,L,C,O,W,S,T=r["H"],r["L"],r["C"],r["O"],r["W"],r["S"],r["T"]
     stop=min(L[:ei+1])*(1-0.0005) if use_stop else None
@@ -93,7 +93,7 @@ def exitsim(r, trail, use_stop, mode="trail"):
                 return (0.5*((tp1/ep-1)*100)+0.5*((px/ep-1)*100)) if half else ((px/ep-1)*100), hold, "STOP"
             if half and H[j]>=run:
                 return 0.5*((tp1/ep-1)*100)+0.5*((run/ep-1)*100), hold, "RUN"
-            if T[j]>=dt.time(14,30):
+            if T[j]>=cut:
                 px=O[j]
                 return (0.5*((tp1/ep-1)*100)+0.5*((px/ep-1)*100)) if half else ((px/ep-1)*100), hold, "CUT"
         px=C[-1]; hold=(len(C)-1-ei)*15/60
@@ -108,7 +108,7 @@ def exitsim(r, trail, use_stop, mode="trail"):
         tp=peak*(1-trail/100)
         if L[j]<=tp and peak>ep:
             return (tp/ep-1)*100, hold, "TRAIL"
-        if T[j]>=dt.time(14,30):
+        if T[j]>=cut:
             return (O[j]/ep-1)*100, hold, "CUT"
     return (C[-1]/ep-1)*100, (len(C)-1-ei)*15/60, "EOD"
 
@@ -134,10 +134,10 @@ def sim(ts,frac,cap0=2000.0):
     return dict(cap=cap,mdd=mdd,worst=min(pcts) if pcts else 0,mx=mx,
                 n=len(ncs),max_nc=max(ncs) if ncs else 0)
 
-def build(raw, trail, use_stop, mode):
+def build(raw, trail, use_stop, mode, cut=dt.time(14,30)):
     out=[]
     for r in raw:
-        ux,hold,res=exitsim(r,trail,use_stop,mode)
+        ux,hold,res=exitsim(r,trail,use_stop,mode,cut)
         out.append(dict(d=r["d"],ux=ux,spot=r["ep"],hold=hold,vix=r["vix"],res=res))
     return out
 
@@ -166,6 +166,22 @@ def main():
                    f"{np.mean([t['ux'] for t in ts]):+8.3f}% {np.mean([t['hold'] for t in ts]):5.1f}  "
                    f"{'/'.join(f'{k}{v}' for k,v in sorted(rc.items()))}")
         if best is None or pf>best[1]: best=(lab,pf,ts)
+    out.append("")
+    out.append("[시간컷 비교 · 트레일 0.15% 손절O]")
+    out.append(f"  {'시간컷':10s} {'승률':>6s} {'PF':>6s} {'계약당':>9s} {'기초평균':>9s} {'보유h':>6s}  구성")
+    for ch,cl in ((dt.time(11,0),"11:00"),(dt.time(11,30),"11:30"),(dt.time(12,0),"12:00"),
+                  (dt.time(13,0),"13:00"),(dt.time(14,0),"14:00"),(dt.time(14,30),"14:30"),
+                  (dt.time(15,55),"종가")):
+        ts2=build(raw,0.15,True,"trail",ch)
+        o2=[to_opt(t) for t in ts2]
+        w2=sum(1 for _,u in o2 if u>0)
+        g2=sum(u for _,u in o2 if u>0); l2=-sum(u for _,u in o2 if u<=0)
+        rc2={}
+        for t in ts2: rc2[t["res"]]=rc2.get(t["res"],0)+1
+        out.append(f"  {cl:10s} {w2/len(ts2)*100:5.1f}% {g2/l2 if l2 else 99:6.2f} "
+                   f"${np.mean([u for _,u in o2]):+8.2f} {np.mean([t['ux'] for t in ts2]):+8.3f}% "
+                   f"{np.mean([t['hold'] for t in ts2]):5.1f}  "
+                   f"{'/'.join(f'{k}{v}' for k,v in sorted(rc2.items()))}")
     out.append("")
     out.append(f"[최적 방식: {best[0]}] 사이징 비교")
     ts=best[2]
