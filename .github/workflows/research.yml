@@ -59,6 +59,7 @@ jobs:
             baserate)  run_one baserate.py ;;
             basesweep) run_one basesweep.py ;;
             exitres)   run_one exitres.py ;;
+            trailsweep) run_one trailsweep.py ;;
             entry3)    run_one entry3.py ;;
             sizing)    run_one sizing.py ;;
             worstdays) run_one worstdays.py ;;
