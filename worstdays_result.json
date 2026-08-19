@@ -1,0 +1,4 @@
+{
+ "at": "2026-08-19 01:35 UTC",
+ "report": "실패:\nTraceback (most recent call last):\n  File \"/home/runner/work/Market-Signal/Market-Signal/worstdays.py\", line 115, in <module>\n    try: r=main()\n           ^^^^^^\n  File \"/home/runner/work/Market-Signal/Market-Signal/worstdays.py\", line 74, in main\n    pc=C[-1]; prev_d2d=d2d\n                       ^^^\nUnboundLocalError: cannot access local variable 'd2d' where it is not associated with a value\n"
+}
