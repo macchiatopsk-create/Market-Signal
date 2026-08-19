@@ -15,25 +15,32 @@ def norm(d):
     except: pass
     d.index=pd.to_datetime(d.index).normalize()
     return d[~d.index.duplicated(keep="last")]
-def grab(tk,tries=4):
+def grab(tk,tries=6):
     import time
     for i in range(tries):
-        try:
-            s=yf.Ticker(tk).history(period="3y")["Close"].dropna()
-            if len(s)>100: return norm(s)
-        except Exception: pass
-        time.sleep(5*(2**i))
+        for fn in (lambda: yf.Ticker(tk).history(period="3y")["Close"].dropna(),
+                   lambda: yf.download(tk,period="3y",progress=False)["Close"].dropna()):
+            try:
+                s=fn()
+                if isinstance(s,pd.DataFrame): s=s.iloc[:,0]
+                if len(s)>100: return norm(s)
+            except Exception: pass
+        time.sleep(8*(i+1))
     return None
 
 def trades():
-    a=grab("^VIX9D") ; a=a if a is not None else grab("^VIX")
-    b=grab("^VIX3M"); v=grab("^VIX")
-    ts=(a/b.reindex(a.index).ffill()).dropna()
-    def _p(w):
-        if len(w)<2: return float("nan")
-        return float((w[:-1]<w[-1]).sum())/(len(w)-1)*100
-    pct=ts.rolling(252).apply(_p,raw=True).shift(1)
-    vmap={str(pd.Timestamp(k).date()):float(x) for k,x in pct.dropna().items()}
+    a=grab("^VIX9D"); b=grab("^VIX3M"); v=grab("^VIX")
+    if v is None: raise RuntimeError("^VIX 수집 실패")
+    if a is None or b is None:
+        print(f"  VIX9D={a is not None} VIX3M={b is not None} — 게이트 없이 전체 실행")
+        vmap=None
+    else:
+        ts=(a/b.reindex(a.index).ffill()).dropna()
+        def _p(w):
+            if len(w)<2: return float("nan")
+            return float((w[:-1]<w[-1]).sum())/(len(w)-1)*100
+        pct=ts.rolling(252).apply(_p,raw=True).shift(1)
+        vmap={str(pd.Timestamp(k).date()):float(x) for k,x in pct.dropna().items()}
     vlv={str(pd.Timestamp(k).date()):float(x) for k,x in v.items()}
 
     df=yf.download("QQQ",period="60d",interval="15m",prepost=True,
@@ -43,7 +50,7 @@ def trades():
     out=[]
     for d in sorted(set(df.index.date)):
         ds=str(d)
-        if vmap.get(ds,-1)<50: continue
+        if vmap is not None and vmap.get(ds,-1)<50: continue
         g=df[df.index.date==d]
         pm=g[(g.index.time>=dt.time(4,0))&(g.index.time<dt.time(9,30))]
         rt=g[(g.index.time>=dt.time(9,30))&(g.index.time<dt.time(16,0))]
