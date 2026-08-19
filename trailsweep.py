@@ -1,4 +1,4 @@
-"""트레일링 폭 0.05% 단위 스윕 — 앱 실제 해상도(5분) 기준.
+"""트레일링 폭 0.05% 단위 스윕 [v2: 봉내 look-ahead 수정] — 앱 실제 해상도(5분) 기준.
 진입 조건 고정, 트레일 폭만 0.05 ~ 1.50% 를 0.05 간격으로.
 비교용으로 15분 / 1시간 판정도 같이 낸다.
 
@@ -74,10 +74,12 @@ def run(seq, t0, ep, tgt, sgn, trail):
             if t.time() >= TIMECUT:
                 return "TIMECUT", ((ep - c) / ep * 100) if sgn > 0 else ((c - ep) / ep * 100), hold
             continue
-        ext = min(ext, l) if sgn > 0 else max(ext, h)
+        # 봉 안 순서를 모르므로 '직전 봉까지의 ext'로 먼저 판정하고, 그 뒤에 ext를 갱신한다.
+        # (같은 봉의 저가로 스톱을 놓고 같은 봉의 고가로 체결시키는 look-ahead 방지)
         tp = ext * (1 + trail / 100) if sgn > 0 else ext * (1 - trail / 100)
         if (h >= tp) if sgn > 0 else (l <= tp):
             return "TRAIL", ((ep - tp) / ep * 100) if sgn > 0 else ((tp - ep) / ep * 100), hold
+        ext = min(ext, l) if sgn > 0 else max(ext, h)
         if t.time() >= FINALCUT:
             return "CUT", ((ep - c) / ep * 100) if sgn > 0 else ((c - ep) / ep * 100), hold
     t, _, _, c = seq[-1]
