@@ -10,7 +10,15 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 
-TRAIL=0.15; DELTA=0.7; SPREAD=1.0   # 왕복 스프레드 %
+TRAIL=0.15
+# ── 실측 기준 (2026-08-18 QQQ 721P 0DTE, 로빈후드) ──
+#   Mark $4.75 · Bid/Ask 4.68/4.82 (스프레드 2.9%) · Delta 0.685 · Theta -1.34/일 · IV 20.6%
+#   QQQ 718 기준 3pt ITM = 0.42% ITM 에서 델타 0.685
+DELTA=0.685
+SPREAD=2.9          # 왕복 스프레드 %
+ITM_PCT=0.42        # 스팟 대비 ITM 폭 %
+TV_RATIO=0.37       # 시간가치 / 프리미엄 (1.75/4.75)
+THETA_PER_HR=0.206  # 시간당 세타 ($) — 1.34/6.5
 def norm(d):
     try: d.index=d.index.tz_localize(None)
     except: pass
@@ -65,23 +73,19 @@ def trades(stop_pct):
     return out
 
 def to_opt(t):
-    """기초 변동 % -> 옵션 프리미엄 % (델타/세타/스프레드 반영)"""
+    """실측 기준 옵션 환산. 프리미엄 = 내재가치 + 시간가치, 세타는 실측 시간당."""
     spot=t["spot"]; vix=t["vix"]
-    T=6.5/(6.5*252)
-    atm=spot*(vix/100)*math.sqrt(T)*0.8
-    intr=spot*0.02*(DELTA-0.5)*2          # 델타0.7 -> 스팟 대비 0.8% ITM
-    prem=intr+atm*(1-(DELTA-0.5)*1.6)
+    intr=spot*ITM_PCT/100                       # 내재가치
+    prem=intr/(1-TV_RATIO)                      # 시간가치 비율 역산
+    prem*= (vix/16.0)**0.5                      # VIX 수준으로 보정 (기준 16)
     move=spot*t["ux"]/100
     gain=move*DELTA
-    tv=prem-intr
-    hrs=t["hold"]
-    tv_left=max(0.0,tv*math.sqrt(max(6.5-hrs,0)/6.5))
-    theta=tv-tv_left
+    theta=THETA_PER_HR*max(t["hold"],0.5)*(prem/4.75)   # 프리미엄 규모 비례
     cost=prem*SPREAD/100
     net=gain-theta-cost
-    return prem, net/prem*100, net*100      # 프리미엄$, 손익%, 손익$/계약
+    return prem, net/prem*100, net*100
 
-def sim(ts, mode, cap0=1000.0):
+def sim(ts, mode, cap0=2000.0):
     cap=cap0; peak=cap; mdd=0.0; curve=[]; nc_hist=[]
     for t in ts:
         prem,pct,usd=to_opt(t)
@@ -90,7 +94,7 @@ def sim(ts, mode, cap0=1000.0):
         else:
             frac={"def":0.25,"mid":0.50,"agg":0.90}.get(mode)
             if mode=="kelly":
-                frac=0.18                    # 하프켈리 근사 (승률75%, 손익비1.4 기준)
+                frac=0.18
             nc=int((cap*frac)//cost)
         if nc<1:
             nc_hist.append(0); curve.append(cap); continue
@@ -104,7 +108,8 @@ def sim(ts, mode, cap0=1000.0):
                 max_nc=max(nc_hist) if nc_hist else 0,curve=curve)
 
 def main():
-    out=[]
+    out=["실측 기준: 프리미엄≈스팟의 0.42% ITM · 델타 0.685 · 스프레드 2.9% · 세타 $1.34/일",
+         "자본 $2,000 시작",""]
     for sp,slab in ((None,"무손절"),(0.9,"손절 0.9%")):
         ts=trades(sp)
         opts=[to_opt(t) for t in ts]
@@ -117,7 +122,7 @@ def main():
         for m,ml in (("fixed","고정 1계약"),("def","수비적 25%"),("kelly","하프켈리 18%"),
                      ("mid","중립 50%"),("agg","공격적 90%")):
             r=sim(ts,m)
-            out.append(f"  {ml:16s} ${r['cap']:9,.0f} {(r['cap']/1000-1)*100:+7.0f}% "
+            out.append(f"  {ml:16s} ${r['cap']:9,.0f} {(r['cap']/2000-1)*100:+7.0f}% "
                        f"{r['mdd']:6.1f}% {r['avg_nc']:8.1f} {r['max_nc']:8d}")
         out.append("")
     return out
