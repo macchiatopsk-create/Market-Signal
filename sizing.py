@@ -99,7 +99,6 @@ def sim(ts, mode, cap0=2000.0):
             if mode=="kelly":
                 frac=0.18
             nc=int((cap*frac)//cost)
-        nc=min(nc,50)                     # 유동성 현실 상한
         if nc<1:
             nc_hist.append(0); curve.append(cap); continue
         cap+=usd*nc
@@ -107,9 +106,13 @@ def sim(ts, mode, cap0=2000.0):
         peak=max(peak,cap); mdd=max(mdd,(peak-cap)/peak*100)
         curve.append(cap)
         if cap<=0: break
-    return dict(cap=cap,mdd=mdd,n=len([x for x in nc_hist if x>0]),
-                avg_nc=np.mean([x for x in nc_hist if x>0]) if any(nc_hist) else 0,
-                max_nc=max(nc_hist) if nc_hist else 0,curve=curve)
+    q=[x for x in nc_hist if x>0]
+    return dict(cap=cap,mdd=mdd,n=len(q),
+                avg_nc=np.mean(q) if q else 0,
+                max_nc=max(nc_hist) if nc_hist else 0,
+                med_nc=np.median(q) if q else 0,
+                last_nc=(q[-1] if q else 0),
+                curve=curve)
 
 def main():
     out=["실측 기준: 프리미엄≈스팟의 0.42% ITM · 델타 0.685 · 스프레드 2.9% · 세타 $1.34/일",
@@ -122,12 +125,14 @@ def main():
         out.append(f"━━ {slab} · 거래 {len(ts)}건 (2년, 연 {len(ts)/2:.0f}회) ━━")
         out.append(f"  옵션 환산: 승률 {w/len(ts)*100:.1f}% · 계약당 평균 ${np.mean([u for _,_,u in opts]):+.2f} "
                    f"· PF {g/l if l else 99:.2f} · 평균 프리미엄 ${np.mean([p for p,_,_ in opts]):.2f}")
-        out.append(f"  {'사이징':16s} {'최종자본':>10s} {'수익률':>8s} {'MDD':>7s} {'평균계약':>8s} {'최대계약':>8s}")
+        out.append(f"  {'사이징':16s} {'최종자본':>12s} {'수익률':>9s} {'MDD':>7s} "
+                   f"{'중앙계약':>8s} {'평균계약':>8s} {'최대계약':>8s} {'마지막':>7s}")
         for m,ml in (("fixed","고정 1계약"),("def","수비적 25%"),("kelly","하프켈리 18%"),
                      ("mid","중립 50%"),("agg","공격적 90%")):
             r=sim(ts,m)
-            out.append(f"  {ml:16s} ${r['cap']:9,.0f} {(r['cap']/2000-1)*100:+7.0f}% "
-                       f"{r['mdd']:6.1f}% {r['avg_nc']:8.1f} {r['max_nc']:8d}")
+            out.append(f"  {ml:16s} ${r['cap']:11,.0f} {(r['cap']/2000-1)*100:+8.0f}% "
+                       f"{r['mdd']:6.1f}% {r['med_nc']:8.0f} {r['avg_nc']:8.1f} "
+                       f"{r['max_nc']:8d} {r['last_nc']:7d}")
         out.append("")
     return out
 
