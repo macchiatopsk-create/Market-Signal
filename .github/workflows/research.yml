@@ -59,6 +59,7 @@ jobs:
             sizing)    run_one sizing.py ;;
             worstdays) run_one worstdays.py ;;
             timecut)   run_one timecut.py ;;
+            l3size)    run_one l3size.py ;;
             gappull)   run_one gappull_test.py ;;
             all)       for f in v9_test.py v10_test.py v7_backtest.py; do run_one $f; done ;;
           esac

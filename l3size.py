@@ -1,0 +1,138 @@
+"""3층(v9) 전략 사이징 비교 — 갭 트랙과 동일 기준으로.
+
+진입: VIX9D/VIX3M 백분위>=50 & 프리마켓 위치>0.5 & VWAP -1σ 터치 → ITM CALL
+청산: TP1 VWAP(50%) → 러너 +1σ / 손절 당일저점 / 14:30 컷
+옵션: 실측 파라미터 (델타0.69, 스프레드2.2%, 세타 $1.39/일, ITM 0.5%)
+"""
+import json, math, datetime as dt, traceback
+import yfinance as yf
+import pandas as pd
+import numpy as np
+
+DELTA=0.69; SPREAD=2.2; ITM_PCT=0.50; TV_RATIO=0.28; THETA_PER_HR=0.214
+def norm(d):
+    try: d.index=d.index.tz_localize(None)
+    except: pass
+    d.index=pd.to_datetime(d.index).normalize()
+    return d[~d.index.duplicated(keep="last")]
+def grab(tk,tries=4):
+    import time
+    for i in range(tries):
+        try:
+            s=yf.Ticker(tk).history(period="3y")["Close"].dropna()
+            if len(s)>100: return norm(s)
+        except Exception: pass
+        time.sleep(5*(2**i))
+    return None
+
+def trades():
+    a=grab("^VIX9D") ; a=a if a is not None else grab("^VIX")
+    b=grab("^VIX3M"); v=grab("^VIX")
+    ts=(a/b.reindex(a.index).ffill()).dropna()
+    def _p(w):
+        if len(w)<2: return float("nan")
+        return float((w[:-1]<w[-1]).sum())/(len(w)-1)*100
+    pct=ts.rolling(252).apply(_p,raw=True).shift(1)
+    vmap={str(pd.Timestamp(k).date()):float(x) for k,x in pct.dropna().items()}
+    vlv={str(pd.Timestamp(k).date()):float(x) for k,x in v.items()}
+
+    df=yf.download("QQQ",period="60d",interval="15m",prepost=True,
+                   auto_adjust=False,progress=False)
+    if isinstance(df.columns,pd.MultiIndex): df.columns=df.columns.get_level_values(0)
+    df=df.dropna(); df.index=df.index.tz_convert("America/New_York")
+    out=[]
+    for d in sorted(set(df.index.date)):
+        ds=str(d)
+        if vmap.get(ds,-1)<50: continue
+        g=df[df.index.date==d]
+        pm=g[(g.index.time>=dt.time(4,0))&(g.index.time<dt.time(9,30))]
+        rt=g[(g.index.time>=dt.time(9,30))&(g.index.time<dt.time(16,0))]
+        if len(pm)<3 or len(rt)<20: continue
+        pmh,pml=float(pm["High"].max()),float(pm["Low"].min())
+        if pmh<=pml: continue
+        op=float(rt["Open"].iloc[0])
+        if (op-pml)/(pmh-pml)<=0.5: continue
+        H=[float(x) for x in rt["High"]];L=[float(x) for x in rt["Low"]]
+        C=[float(x) for x in rt["Close"]];O=[float(x) for x in rt["Open"]]
+        V=[float(x) for x in rt["Volume"]];T=[t.time() for t in rt.index]
+        cv=cpv=cpv2=0.0; W=[];S=[]
+        for i in range(len(C)):
+            tp=(H[i]+L[i]+C[i])/3
+            cv+=V[i];cpv+=tp*V[i];cpv2+=tp*tp*V[i]
+            w=cpv/cv if cv else tp
+            W.append(w);S.append(math.sqrt(max(cpv2/cv-w*w,0.0)) if cv else 0.0)
+        ei=ep=None
+        for i in range(1,len(C)):
+            if T[i]>=dt.time(14,0): break
+            if S[i]<=1e-9: continue
+            if L[i]<=W[i]-S[i]: ei,ep=i,W[i]-S[i]; break
+        if ei is None: continue
+        day_lo=min(L[:ei+1]); stop=day_lo*(1-0.0005)
+        half=False; tp1=None; ux=None; hold=0
+        for j in range(ei+1,len(C)):
+            hold=(j-ei)*15/60
+            if not half and H[j]>=W[j]: tp1,half=W[j],True
+            run=W[j]+S[j]
+            if L[j]<=stop:
+                px=stop
+                ux=(0.5*((tp1/ep-1)*100)+0.5*((px/ep-1)*100)) if half else ((px/ep-1)*100)
+                break
+            if half and H[j]>=run:
+                ux=0.5*((tp1/ep-1)*100)+0.5*((run/ep-1)*100); break
+            if T[j]>=dt.time(14,30):
+                px=O[j]
+                ux=(0.5*((tp1/ep-1)*100)+0.5*((px/ep-1)*100)) if half else ((px/ep-1)*100)
+                break
+        if ux is None:
+            px=C[-1]; hold=(len(C)-1-ei)*15/60
+            ux=(0.5*((tp1/ep-1)*100)+0.5*((px/ep-1)*100)) if half else ((px/ep-1)*100)
+        out.append(dict(d=ds,ux=ux,spot=ep,hold=hold,vix=vlv.get(ds,16.0)))
+    return out
+
+def to_opt(t):
+    intr=t["spot"]*ITM_PCT/100
+    prem=intr/(1-TV_RATIO)*((t["vix"]/16.0)**0.5)
+    gain=t["spot"]*t["ux"]/100*DELTA
+    theta=THETA_PER_HR*max(t["hold"],0.5)*(prem/4.75)
+    net=max(gain-theta-prem*SPREAD/100,-prem)
+    return prem,net*100
+
+def sim(ts,frac,cap0=2000.0):
+    cap=cap0;peak=cap;mdd=0.0;pcts=[];ncs=[];st=0;mx=0
+    for t in ts:
+        prem,usd=to_opt(t); cost=prem*100
+        nc=1 if frac is None else int((cap*frac)//cost)
+        if nc<1: continue
+        before=cap; cap+=usd*nc
+        pcts.append(usd*nc/before*100); ncs.append(nc)
+        if usd<0: st+=1; mx=max(mx,st)
+        else: st=0
+        peak=max(peak,cap);mdd=max(mdd,(peak-cap)/peak*100)
+    return dict(cap=cap,mdd=mdd,worst=min(pcts) if pcts else 0,mx=mx,
+                n=len(ncs),max_nc=max(ncs) if ncs else 0)
+
+def main():
+    ts=trades()
+    if not ts: return ["3층 조건 충족일 없음 (15분봉 60일)"]
+    opts=[to_opt(t) for t in ts]
+    w=sum(1 for _,u in opts if u>0)
+    g=sum(u for _,u in opts if u>0); l=-sum(u for _,u in opts if u<=0)
+    out=[f"3층(v9) · 15분봉 60일 · 조건충족 {len(ts)}건",
+         f"옵션 환산: 승률 {w/len(ts)*100:.1f}% · 계약당 평균 ${np.mean([u for _,u in opts]):+.2f} "
+         f"· PF {g/l if l else 99:.2f} · 평균 프리미엄 ${np.mean([p for p,_ in opts]):.2f}",
+         f"기초 평균 {np.mean([t['ux'] for t in ts]):+.3f}% · 평균 보유 {np.mean([t['hold'] for t in ts]):.1f}시간",""]
+    out.append(f"  {'사이징':12s} {'최종자본':>11s} {'수익률':>8s} {'MDD':>7s} {'최악1회':>7s} {'최장연패':>7s} {'최대계약':>7s}")
+    out.append(f"  {'고정 1계약':12s} " + (lambda r: f"${r['cap']:10,.0f} {(r['cap']/2000-1)*100:+7.0f}% "
+               f"{r['mdd']:6.1f}% {r['worst']:6.1f}% {r['mx']:7d} {r['max_nc']:7d}")(sim(ts,None)))
+    for f in (0.30,0.40,0.50,0.60,0.70):
+        r=sim(ts,f)
+        out.append(f"  자본 {f*100:3.0f}%     ${r['cap']:10,.0f} {(r['cap']/2000-1)*100:+7.0f}% "
+                   f"{r['mdd']:6.1f}% {r['worst']:6.1f}% {r['mx']:7d} {r['max_nc']:7d}")
+    return out
+
+if __name__=="__main__":
+    try: r=main()
+    except Exception: r=["실패:\n"+traceback.format_exc()]
+    txt="\n".join(r); print(txt)
+    json.dump({"at":dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),"report":txt},
+              open("l3size_result.json","w"),ensure_ascii=False,indent=1)
