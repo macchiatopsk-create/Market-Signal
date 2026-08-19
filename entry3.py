@@ -95,7 +95,12 @@ def run(interval, period, stop_pct=None):
                                 if fav>mfe: mfe,mfe_t=fav,T[k]
                                 if stop_px is not None:
                                     if (H[k]>=stop_px) if sgn>0 else (L[k]<=stop_px):
-                                        res,pnl="STOP",-stop_pct; break
+                                        res,pnl="STOP",-stop_pct
+                                        # 손절 안 했으면 이후 갭필했는지
+                                        for k2 in range(k+1,len(C)):
+                                            if (L[k2]<=tgt) if sgn>0 else (H[k2]>=tgt):
+                                                res="STOP_RECOV"; break
+                                        break
                                 if not fl:
                                     if (L[k]<=tgt) if sgn>0 else (H[k]>=tgt):
                                         fl=True; ext=min(L[k],tgt) if sgn>0 else max(H[k],tgt)
@@ -124,10 +129,13 @@ def rep(rows,mode,lab,out):
     g=sum(x["pnl"] for x in sel if x["pnl"]>0); l=-sum(x["pnl"] for x in sel if x["pnl"]<=0)
     rc={}
     for x in sel: rc[x["res"]]=rc.get(x["res"],0)+1
+    rcv=rc.get("STOP_RECOV",0); stp=rc.get("STOP",0)+rcv
     out.append(f"  {lab:22s} n={n:3d}(놓침{miss:2d}) 승률 {w/n*100:5.1f}%({ci[0]:.0f}~{ci[1]:.0f}) "
                f"PF {g/l if l else 99:6.2f} 평균 {np.mean([x['pnl'] for x in sel]):+.3f}% "
                f"| 진입σ {np.mean([x['sig'] for x in sel]):+.2f} MFE {np.mean([x['mfe'] for x in sel]):.3f}% "
-               f"MAE {np.mean([x['mae'] for x in sel]):.3f}% | {'/'.join(f'{k}{v}' for k,v in sorted(rc.items()))}")
+               f"MAE {np.mean([x['mae'] for x in sel]):.3f}% | 손절{stp}건"
+               f"{f'(그중 {rcv}건은 안했으면 갭필됨)' if stp else ''} "
+               f"| {'/'.join(f'{k}{v}' for k,v in sorted(rc.items()))}")
 
 def main():
     out=[]
@@ -144,7 +152,7 @@ def main():
                 rep(o100,m,"   "+ml,out)
         out.append("")
     out.append("[손절 폭 비교 · 1시간봉 · A진입]")
-    for sp in (0.6,0.7,0.8,None):
+    for sp in (0.6,0.7,0.8,0.9,1.0,1.2,1.5,None):
         rows=run("1h","2y",sp)
         rep(rows,"A",f"손절 {sp if sp else '없음'}%",out)
     return out
