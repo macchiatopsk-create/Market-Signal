@@ -89,35 +89,44 @@ def to_opt(t):
     return prem, net/prem*100, net*100
 
 def sim(ts, mode, cap0=2000.0):
-    cap=cap0; peak=cap; mdd=0.0; curve=[]; nc_hist=[]
+    cap=cap0; peak=cap; mdd=0.0; curve=[]; nc_hist=[]; pnls=[]; pnl_pcts=[]
     for t in ts:
         prem,pct,usd=to_opt(t)
         cost=prem*100
         if mode=="fixed": nc=1
         else:
-            frac={"def":0.25,"mid":0.50,"agg":0.90}.get(mode)
-            if mode=="kelly":
-                frac=0.18
+            frac=float(mode)/100.0
             nc=int((cap*frac)//cost)
         if nc<1:
             nc_hist.append(0); curve.append(cap); continue
+        before=cap
         cap+=usd*nc
+        pnls.append(usd*nc); pnl_pcts.append(usd*nc/before*100)
         nc_hist.append(nc)
         peak=max(peak,cap); mdd=max(mdd,(peak-cap)/peak*100)
         curve.append(cap)
         if cap<=0: break
     q=[x for x in nc_hist if x>0]
+    # 연속 손실 최장 / 최악 단일 손실(자본대비 %)
+    streak=mx=0; worst=0.0
+    c=cap0
+    for x in pnls:
+        if x<0:
+            streak+=1; mx=max(mx,streak)
+        else: streak=0
+    worst=min(pnl_pcts) if pnl_pcts else 0.0
     return dict(cap=cap,mdd=mdd,n=len(q),
                 avg_nc=np.mean(q) if q else 0,
                 max_nc=max(nc_hist) if nc_hist else 0,
                 med_nc=np.median(q) if q else 0,
                 last_nc=(q[-1] if q else 0),
+                maxstreak=mx, worst=worst,
                 curve=curve)
 
 def main():
     out=["실측 기준: 프리미엄≈스팟의 0.42% ITM · 델타 0.685 · 스프레드 2.9% · 세타 $1.34/일",
          "자본 $2,000 시작",""]
-    for sp,slab in ((None,"무손절"),(0.9,"손절 0.9%")):
+    for sp,slab in ((None,"무손절"),):
         ts=trades(sp)
         opts=[to_opt(t) for t in ts]
         w=sum(1 for _,p,_ in opts if p>0)
@@ -125,14 +134,15 @@ def main():
         out.append(f"━━ {slab} · 거래 {len(ts)}건 (2년, 연 {len(ts)/2:.0f}회) ━━")
         out.append(f"  옵션 환산: 승률 {w/len(ts)*100:.1f}% · 계약당 평균 ${np.mean([u for _,_,u in opts]):+.2f} "
                    f"· PF {g/l if l else 99:.2f} · 평균 프리미엄 ${np.mean([p for p,_,_ in opts]):.2f}")
-        out.append(f"  {'사이징':16s} {'최종자본':>12s} {'수익률':>9s} {'MDD':>7s} "
-                   f"{'중앙계약':>8s} {'평균계약':>8s} {'최대계약':>8s} {'마지막':>7s}")
-        for m,ml in (("fixed","고정 1계약"),("def","수비적 25%"),("kelly","하프켈리 18%"),
-                     ("mid","중립 50%"),("agg","공격적 90%")):
+        out.append(f"  {'사이징':14s} {'최종자본':>12s} {'수익률':>9s} {'MDD':>7s} "
+                   f"{'최악1회':>7s} {'최장연패':>7s} {'중앙계약':>8s} {'최대계약':>8s}")
+        modes=[("fixed","고정 1계약")]+[(str(p),f"자본 {p}%") for p in
+               (20,25,30,35,40,45,50,60,75,90)]
+        for m,ml in modes:
             r=sim(ts,m)
-            out.append(f"  {ml:16s} ${r['cap']:11,.0f} {(r['cap']/2000-1)*100:+8.0f}% "
-                       f"{r['mdd']:6.1f}% {r['med_nc']:8.0f} {r['avg_nc']:8.1f} "
-                       f"{r['max_nc']:8d} {r['last_nc']:7d}")
+            out.append(f"  {ml:14s} ${r['cap']:11,.0f} {(r['cap']/2000-1)*100:+8.0f}% "
+                       f"{r['mdd']:6.1f}% {r['worst']:6.1f}% {r['maxstreak']:7d} "
+                       f"{r['med_nc']:8.0f} {r['max_nc']:8d}")
         out.append("")
     return out
 
