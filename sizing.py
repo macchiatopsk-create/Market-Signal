@@ -14,11 +14,12 @@ TRAIL=0.15
 # ── 실측 기준 (2026-08-18 QQQ 721P 0DTE, 로빈후드) ──
 #   Mark $4.75 · Bid/Ask 4.68/4.82 (스프레드 2.9%) · Delta 0.685 · Theta -1.34/일 · IV 20.6%
 #   QQQ 718 기준 3pt ITM = 0.42% ITM 에서 델타 0.685
-DELTA=0.685
-SPREAD=2.9          # 왕복 스프레드 %
-ITM_PCT=0.42        # 스팟 대비 ITM 폭 %
-TV_RATIO=0.37       # 시간가치 / 프리미엄 (1.75/4.75)
-THETA_PER_HR=0.206  # 시간당 세타 ($) — 1.34/6.5
+#   콜 714C $5.03 델타0.698 세타-1.44 / 풋 721P $4.75 델타0.685 세타-1.34
+DELTA=0.69
+SPREAD=2.2          # 왕복 스프레드 % (콜 2.0 / 풋 2.9 평균)
+ITM_PCT=0.50        # 스팟 대비 ITM 폭 %
+TV_RATIO=0.28       # 시간가치 비중
+THETA_PER_HR=0.214  # 시간당 세타 ($) — 1.39/6.5
 def norm(d):
     try: d.index=d.index.tz_localize(None)
     except: pass
@@ -83,6 +84,8 @@ def to_opt(t):
     theta=THETA_PER_HR*max(t["hold"],0.5)*(prem/4.75)   # 프리미엄 규모 비례
     cost=prem*SPREAD/100
     net=gain-theta-cost
+    # 옵션 매수 최대손실 = 프리미엄 전액 (감마로 델타가 줄어 그 이하로 못 감)
+    net=max(net,-prem)
     return prem, net/prem*100, net*100
 
 def sim(ts, mode, cap0=2000.0):
@@ -96,6 +99,7 @@ def sim(ts, mode, cap0=2000.0):
             if mode=="kelly":
                 frac=0.18
             nc=int((cap*frac)//cost)
+        nc=min(nc,50)                     # 유동성 현실 상한
         if nc<1:
             nc_hist.append(0); curve.append(cap); continue
         cap+=usd*nc
