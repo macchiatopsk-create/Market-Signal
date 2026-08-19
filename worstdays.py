@@ -36,8 +36,8 @@ def main():
         ds=str(d)
         O=[float(x) for x in g["Open"]];H=[float(x) for x in g["High"]]
         L=[float(x) for x in g["Low"]];C=[float(x) for x in g["Close"]]
+        d2d=(C[-1]/pc-1)*100 if pc else 0.0
         if pc:
-            d2d=(C[-1]/pc-1)*100
             vx=vm.get(ds)
             if vx is None or abs(vx)<5.0:
                 gap=O[0]-pc; gp=gap/pc*100
