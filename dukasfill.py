@@ -17,9 +17,11 @@ INST = "QQQUSUSD"
 SCALE = 1000.0
 DATA = "data/1m"
 MONTHS_BACK = 24
-HOURS = range(12, 22)          # UTC. DST 양쪽 커버 (ET 07~17시)
-DELAY = 0.6
-RETRY = 4
+HOURS = range(13, 21)          # UTC 13~20 = ET 09~16 (여름). 정규장만
+DELAY = 0.25
+RETRY = 3
+DAYS_PER_RUN = 12              # 한 실행당 처리 거래일 수 (타임아웃 여유)
+BUDGET_SEC = 1500              # 25분 넘으면 그때까지 받은 것 저장하고 종료
 OUT = []
 
 
@@ -98,37 +100,40 @@ def day_bars(day):
     return out.round(4), fails
 
 
+def load_done():
+    """이미 저장된 거래일 집합."""
+    if not os.path.isdir(DATA):
+        return set()
+    out = set()
+    for f in os.listdir(DATA):
+        if f.startswith("QQQ_") and f.endswith(".csv.gz"):
+            try:
+                d = pd.read_csv(f"{DATA}/{f}", compression="gzip", usecols=["ts"])
+                out |= set(pd.to_datetime(d["ts"]).dt.date.unique())
+            except Exception:
+                pass
+    return out
+
+
+def save_month(yy, mm, frames):
+    """해당 월 파일에 병합 저장 (중복 제거)."""
+    path = f"{DATA}/QQQ_{yy}-{mm:02d}.csv.gz"
+    new = pd.concat(frames, ignore_index=True)
+    if os.path.exists(path):
+        old = pd.read_csv(path, compression="gzip")
+        new = pd.concat([old, new], ignore_index=True)
+    new = new.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
+    new.to_csv(path, index=False, compression="gzip")
+    return path, len(new), os.path.getsize(path)
+
+
 def main():
     os.makedirs(DATA, exist_ok=True)
+    t0 = time.time()
     today = dt.date.today()
+    start = today - dt.timedelta(days=MONTHS_BACK * 31)
 
-    # 대상 월 = 최근 24개월 중 파일이 없는 가장 오래된 달
-    months = []
-    y, m = today.year, today.month
-    for _ in range(MONTHS_BACK):
-        months.append((y, m))
-        m -= 1
-        if m == 0:
-            y, m = y - 1, 12
-    months.reverse()
-    target = None
-    for (yy, mm) in months:
-        if not os.path.exists(f"{DATA}/QQQ_{yy}-{mm:02d}.csv.gz"):
-            target = (yy, mm)
-            break
-    if target is None:
-        log(f"최근 {MONTHS_BACK}개월 모두 확보 완료. 남은 작업 없음")
-        have = sorted(os.listdir(DATA))
-        log(f"보유 파일 {len(have)}개: {have[0]} ~ {have[-1]}")
-        return OUT
-
-    yy, mm = target
-    log(f"대상 월: {yy}-{mm:02d}")
-
-    # 해당 월 거래일 (yfinance 일봉 기준 = 실제 개장일)
-    s = dt.date(yy, mm, 1)
-    e = (dt.date(yy + (mm == 12), (mm % 12) + 1, 1))
-    dd = yf.download("QQQ", start=s.isoformat(), end=e.isoformat(),
+    dd = yf.download("QQQ", start=start.isoformat(), end=today.isoformat(),
                      interval="1d", auto_adjust=False, progress=False)
     if isinstance(dd.columns, pd.MultiIndex):
         dd.columns = dd.columns.get_level_values(0)
@@ -137,50 +142,53 @@ def main():
         dd.index = dd.index.tz_localize(None)
     except Exception:
         pass
-    tdays = [pd.Timestamp(x).date() for x in dd.index]
-    log(f"거래일 {len(tdays)}일: {tdays[0] if tdays else '-'} ~ {tdays[-1] if tdays else '-'}")
+    daily = {pd.Timestamp(x).date(): dd.loc[x] for x in dd.index}
+    alldays = sorted(daily.keys())
+
+    done = load_done()
+    todo = [d for d in alldays if d not in done]
+    log(f"전체 거래일 {len(alldays)}  확보 {len(done)}  남음 {len(todo)}")
+    if not todo:
+        log("백필 완료. 남은 작업 없음")
+        return OUT
+    # 최신부터 채운다 (최근 데이터가 먼저 쓸모 있으므로)
+    todo = sorted(todo, reverse=True)[:DAYS_PER_RUN]
+    log(f"이번 실행 대상 {len(todo)}일: {todo[-1]} ~ {todo[0]}")
     log("")
 
-    frames, report = [], []
-    t0 = time.time()
-    for d in tdays:
+    bucket, report, got = {}, [], 0
+    for d in sorted(todo):
+        if time.time() - t0 > BUDGET_SEC:
+            log(f"  [시간예산 초과 — {d} 이후 중단]")
+            break
         bars, fails = day_bars(d)
         if len(bars) == 0:
-            report.append(f"  {d}  틱없음 (실패시간대 {fails})")
+            report.append(f"  {d}  틱없음 (실패 {fails})")
             continue
-        ref = dd.loc[dd.index.date == d] if hasattr(dd.index, "date") else None
+        ref = daily.get(d)
         chk = ""
-        if ref is not None and len(ref):
-            rc = float(ref["Close"].iloc[0]); rh = float(ref["High"].iloc[0])
-            rl = float(ref["Low"].iloc[0])
-            dc = float(bars["Close"].iloc[-1]); dh = float(bars["High"].max())
-            dl = float(bars["Low"].min())
-            chk = (f"종가차 {dc-rc:+.3f}  고가차 {dh-rh:+.3f}  저가차 {dl-rl:+.3f}")
+        if ref is not None:
+            rc, rh, rl = float(ref["Close"]), float(ref["High"]), float(ref["Low"])
+            dc = float(bars["Close"].iloc[-1])
+            dh, dl = float(bars["High"].max()), float(bars["Low"].min())
+            chk = f"종가차 {dc-rc:+.3f} 고가차 {dh-rh:+.3f} 저가차 {dl-rl:+.3f}"
             if abs(dc - rc) > 0.5 or abs(dh - rh) > 0.8 or abs(dl - rl) > 0.8:
-                chk += "  ⚠괴리"
+                chk += " WARN"
         report.append(f"  {d}  봉 {len(bars):3d}  실패 {fails}  {chk}")
-        bars = bars.copy()
-        bars.insert(0, "ts", bars.index.strftime("%Y-%m-%d %H:%M"))
-        frames.append(bars.reset_index(drop=True))
+        b = bars.copy()
+        b.insert(0, "ts", b.index.strftime("%Y-%m-%d %H:%M"))
+        bucket.setdefault((d.year, d.month), []).append(b.reset_index(drop=True))
+        got += 1
 
-    if not frames:
-        log("수집 실패 — 파일 생성 안 함")
-        for r in report:
-            log(r)
-        return OUT
-
-    allb = pd.concat(frames, ignore_index=True)
-    path = f"{DATA}/QQQ_{yy}-{mm:02d}.csv.gz"
-    allb.to_csv(path, index=False, compression="gzip")
-    sz = os.path.getsize(path)
-    log(f"저장 {path}  {len(allb):,d}봉  {sz/1024:.0f}KB  "
-        f"소요 {time.time()-t0:.0f}초")
+    for (yy, mm), fr in bucket.items():
+        path, n, sz = save_month(yy, mm, fr)
+        log(f"저장 {path}  누적 {n:,d}봉  {sz/1024:.0f}KB")
     log("")
     for r in report:
         log(r)
     log("")
-    done = len([f for f in os.listdir(DATA) if f.endswith('.csv.gz')])
-    log(f"진행: {done}/{MONTHS_BACK}개월 확보")
+    remain = len(todo) and (len(alldays) - len(done) - got)
+    log(f"이번 실행 {got}일 확보 · 소요 {time.time()-t0:.0f}초 · 남은 거래일 약 {remain}일")
     return OUT
 
 
