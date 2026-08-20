@@ -62,6 +62,7 @@ jobs:
             trailsweep) run_one trailsweep.py ;;
             minres)    run_one minres.py ;;
             srcprobe)  run_one srcprobe.py ;;
+            dukasval)  run_one dukasval.py ;;
             entry3)    run_one entry3.py ;;
             sizing)    run_one sizing.py ;;
             worstdays) run_one worstdays.py ;;
