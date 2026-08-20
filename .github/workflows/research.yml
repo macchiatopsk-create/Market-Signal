@@ -63,6 +63,7 @@ jobs:
             minres)    run_one minres.py ;;
             srcprobe)  run_one srcprobe.py ;;
             dukasval)  run_one dukasval.py ;;
+            dukasfill) run_one dukasfill.py ;;
             entry3)    run_one entry3.py ;;
             sizing)    run_one sizing.py ;;
             worstdays) run_one worstdays.py ;;
@@ -77,5 +78,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git pull --rebase --autostash || true
           git add *_result.json *_confirm.json *_range.json 2>/dev/null || true
+          git add -A data 2>/dev/null || true
           git commit -m "research $(date -u +%F_%H%M)" || echo none
           git push || echo skip
