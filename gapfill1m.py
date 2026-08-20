@@ -196,9 +196,14 @@ def main():
         rep.append(f"  {d} 갭{gp:+.2f}%  봉 {n:3d}  고{dh-rh:+.3f} 저{dl-rl:+.3f}  저장")
         got += 1
 
-    log(f"이번 실행 {got}일 확보 · 소요 {time.time()-t0:.0f}초")
+    el = time.time() - t0
+    log(f"이번 실행 {got}일 확보 · 소요 {el:.0f}초")
     ok_n = sum(1 for k, v in st.items() if v.get("ok"))
-    log(f"누적 {ok_n}/{len(gd)}일")
+    left = len(gd) - ok_n
+    rate = (got / el * BUDGET_SEC) if el > 0 and got else 0
+    eta = (left / rate) if rate else 0
+    log(f"누적 {ok_n}/{len(gd)}일 ({ok_n/len(gd)*100:.1f}%) · 남음 {left}일 · "
+        f"이 속도면 {eta:.0f}회 실행 (35분 간격 → 약 {eta*35/60:.1f}시간)")
     log("")
     for r in rep:
         log(r)

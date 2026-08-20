@@ -1,0 +1,42 @@
+name: backfill-1m
+
+on:
+  schedule:
+    - cron: "*/35 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backfill-1m
+  cancel-in-progress: false
+
+jobs:
+  fill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: deps
+        run: pip install -q yfinance pandas numpy
+
+      - name: run
+        run: python gapfill1m.py
+
+      - name: persist
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase --autostash || true
+          git add -A data 2>/dev/null || true
+          git add gapfill1m_result.json gapfill_result.json 2>/dev/null || true
+          git commit -m "backfill-1m $(date -u +%F_%H%M)" || echo none
+          git push || echo skip
