@@ -213,4 +213,4 @@ if __name__ == "__main__":
         print(OUT[-1])
     json.dump({"at": dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
                "report": "\n".join(OUT)},
-              open("gapfill_result.json", "w"), ensure_ascii=False, indent=1)
+              open("gapfill1m_result.json", "w"), ensure_ascii=False, indent=1)
