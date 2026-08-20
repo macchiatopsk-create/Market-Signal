@@ -64,6 +64,7 @@ jobs:
             srcprobe)  run_one srcprobe.py ;;
             dukasval)  run_one dukasval.py ;;
             dukasfill) run_one dukasfill.py ;;
+            tvprobe)   run_one tvprobe.py ;;
             entry3)    run_one entry3.py ;;
             sizing)    run_one sizing.py ;;
             worstdays) run_one worstdays.py ;;
