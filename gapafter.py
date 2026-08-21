@@ -45,7 +45,7 @@ def sim(day,info,bars,minutes,trail):
         cut=g[g.index<=pd.Timestamp(f"{day} 11:30")]
         if cut.empty:return None
         px=float(cut.Close.iloc[-1]);p=((entry-px)/entry*100) if sgn>0 else ((px-entry)/entry*100)
-        return dict(day=day,pre=False,filled=False,cover=cover,nofill_pnl=p)
+        return dict(day=day,pre=False,filled=False,cover=cover,pnl=p,nofill_pnl=p)
     fill_px=target;fill_pnl=((entry-fill_px)/entry*100) if sgn>0 else ((fill_px-entry)/entry*100);post=g[g.index>fill]
     if post.empty:return None
     post_max=max(((fill_px-float(r.Low))/fill_px*100) if sgn>0 else ((float(r.High)-fill_px)/fill_px*100) for _,r in post.iterrows())
@@ -70,17 +70,18 @@ def main():
     daily=load_daily();bars=load_1m();have=set(str(x) for x in bars.index.date)
     out=[f"1m 저장 거래일={len(have)}","QQQ gap 0.2~1.5% / |VIX open-prevclose|<5% / cover>=40% / entry=첫봉종가","11:30 미필 컷 / fill 후 trail / 14:00 최종컷 / fill bar 제외","",]
     for mins,name in [(5,"5m"),(15,"15m"),(60,"1h")]:
-        sig=[];filled=[];nofill=[];prefill=[]
+        sig=[];filled=[];prefill=[]
         for day,info in daily.items():
             if day not in have or not np.isfinite(info["vix"]) or abs(info["vix"])>=5:continue
             r=sim(day,info,bars,mins,.15)
             if not r:continue
             if r.get("pre"):prefill.append(r)
-            elif r.get("filled"):sig.append(r);filled.append(r)
-            elif "nofill_pnl" in r:sig.append(r);nofill.append(r)
+            else:sig.append(r);filled += [r] if r.get("filled") else []
+        nofill=[r for r in sig if not r.get("filled")]
         out.append(f"[{name}] 신호={len(sig)} · 갭필={len(filled)} · 11:30 미필={len(nofill)} · 진입봉내 이미 필={len(prefill)}")
         out.append(stats(sig,"  전체 전략 trail0.15"))
-        out.append(stats(filled,"  갭필 즉시청산",key="fill_pnl") if filled else "  갭필 즉시청산: n=0")
+        fill_exit=[dict(pnl=r["fill_pnl"]) for r in filled]+[dict(pnl=r["nofill_pnl"]) for r in nofill]
+        out.append(stats(fill_exit,"  갭필 즉시청산/미필컷"))
         out.append(stats(filled,"  갭필 후 trail0.15"))
         if filled:
             vals=[x["post_max"] for x in filled]
@@ -94,7 +95,7 @@ def main():
         r=sim(day,info,bars,5,.15)
         if r and not r.get("pre"):universe.append(day)
     for t in (.10,.15,.20,.30,.50):
-        rs=[sim(day,daily[day],bars,5,t) for day in universe];rs=[r for r in rs if r and "pnl" in r]
+        rs=[sim(day,daily[day],bars,5,t) for day in universe];rs=[r for r in rs if r]
         out.append(stats(rs,f"trail {t:.2f}%"))
     return out
 
