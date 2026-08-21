@@ -90,6 +90,31 @@ def run_mom(seq, t0, ep, dirn, stop, trail):
     return c, hold_h(t, t0)
 
 
+def agg(bars, k):
+    out = []
+    for i in range(0, len(bars), k):
+        ch = bars[i:i + k]
+        if ch:
+            out.append((ch[-1][0], max(x[1] for x in ch), min(x[2] for x in ch), ch[-1][3]))
+    return out
+
+
+def run_mom_app(seq5, t0, ep, dirn, stop, trail):
+    """앱 모드(D): 5분 wake, 극점은 봉 H/L(종가 이전 발생이라 유효), 판정·체결은 종가."""
+    ext = ep
+    for (t, h, l, c) in seq5:
+        ext = max(ext, h) if dirn > 0 else min(ext, l)
+        tp = ext * (1 - trail / 100) if dirn > 0 else ext * (1 + trail / 100)
+        if (c <= tp) if dirn > 0 else (c >= tp):
+            return c, hold_h(t, t0)
+        if (c <= stop) if dirn > 0 else (c >= stop):
+            return c, hold_h(t, t0)
+        if t.time() >= FINALCUT:
+            return c, hold_h(t, t0)
+    t, _, _, c = seq5[-1]
+    return c, hold_h(t, t0)
+
+
 def stat(rows):
     op = [r[0] for r in rows]
     n = len(op)
@@ -100,7 +125,12 @@ def stat(rows):
     g = sum(x for x in op if x > 0)
     l = -sum(x for x in op if x <= 0)
     pf = "패배0" if l <= 0 else f"{g/l:.2f}"
-    return (f"승률 {w/n*100:5.1f}% (CI {ci[0]:4.1f}%)  PF {pf:>5s}  "
+    srt = sorted(op, reverse=True)
+    op2 = srt[2:] if n > 4 else srt
+    g2 = sum(x for x in op2 if x > 0)
+    l2 = -sum(x for x in op2 if x <= 0)
+    pf2 = "패배0" if l2 <= 0 else f"{g2/l2:.2f}"
+    return (f"승률 {w/n*100:5.1f}% (CI {ci[0]:4.1f}%)  PF {pf:>5s}  상위2제외 {pf2:>5s}  "
             f"옵션평균 {np.mean(op):+6.1f}%  보유 {np.mean([r[1] for r in rows]):.2f}h")
 
 
@@ -159,7 +189,7 @@ def main():
             if cov15 < COVER_MIN:
                 B.append(dict(dirn=sgn, ep=ep15, t0=b1[14][0].time(),
                               stop=(or_lo if sgn > 0 else or_hi),
-                              seq=b1[15:], iv=iv))
+                              seq=b1[15:], seq5=agg(b1[15:], 5), iv=iv))
 
     out = [f"orbtrail · 갭일 {len(days)}일 · ORB에 트레일 익절 장착 후 재대결",
            f"비교 기준: 우리 갭필 전기준선·0.15 (같은 데이터 mode A): PF 1.55 · +5.6% · n=35",
@@ -176,7 +206,18 @@ def main():
                     rows.append((o, hold))
             out.append(f"  트레일 {T:4.2f}%  {stat(rows)}")
         out.append("")
-    out.append("※ 74일 한 레짐 · mode A(이상적 1분) · 275일 재검증 대상")
+    out.append("[ORB-B 앱 실행 모드(D) — 5분 wake·종가 체결]")
+    for T in TRAILS:
+        rows = []
+        for sd in B:
+            px, hold = run_mom_app(sd["seq5"], sd["t0"], sd["ep"], sd["dirn"], sd["stop"], T)
+            side = "c" if sd["dirn"] > 0 else "p"
+            o = bsm_net(side, sd["ep"], px, sd["t0"], hold, sd["iv"])
+            if o is not None:
+                rows.append((o, hold))
+        out.append(f"  트레일 {T:4.2f}%  {stat(rows)}")
+    out.append("")
+    out.append("※ 한 레짐 · 275일 재검증 대상")
     return out
 
 
