@@ -67,6 +67,7 @@ jobs:
             minres)    run_one minres.py ;;
             minres2)   run_one minres2.py ;;
             pollsim)   run_one pollsim.py ;;
+            ideatest)  run_one ideatest.py ;;
             srcprobe)  run_one srcprobe.py ;;
             dukasval)  run_one dukasval.py ;;
             dukasfill) run_one dukasfill.py ;;
