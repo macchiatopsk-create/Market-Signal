@@ -116,6 +116,32 @@ def run_poll(seq5, t0, ep, tgt, sgn, trail):
     return c, hold_h(t, t0)
 
 
+def run_app(seq5, t0, ep, tgt, sgn, trail):
+    """모드 D — 앱 정확 재현: 5분봉 Low로 감지/ext, 발동·체결은 그 봉 종가(cur).
+    당봉 저가→종가 순서는 시간상 유효(저가는 종가 이전에 발생)라 look-ahead 아님."""
+    filled, ext = False, None
+    for (t, h, l, c) in seq5:
+        if not filled:
+            if (l <= tgt) if sgn > 0 else (h >= tgt):
+                filled = True
+                ext = min(l, tgt) if sgn > 0 else max(h, tgt)
+                tp = ext * (1 + trail / 100) if sgn > 0 else ext * (1 - trail / 100)
+                if (c >= tp) if sgn > 0 else (c <= tp):     # 같은 wake에 발동 가능 (앱 동작)
+                    return c, hold_h(t, t0)
+                continue
+            if t.time() >= TIMECUT:
+                return c, hold_h(t, t0)
+            continue
+        ext = min(ext, l) if sgn > 0 else max(ext, h)       # 앱: 당봉 저가까지 반영 후
+        tp = ext * (1 + trail / 100) if sgn > 0 else ext * (1 - trail / 100)
+        if (c >= tp) if sgn > 0 else (c <= tp):             # 종가(=wake 현재가)로 판정·체결
+            return c, hold_h(t, t0)
+        if t.time() >= FINALCUT:
+            return c, hold_h(t, t0)
+    t, _, _, c = seq5[-1]
+    return c, hold_h(t, t0)
+
+
 def bsm_net(sgn, ep, exit_px, t0, hold, iv):
     flag = "p" if sgn > 0 else "c"
     K = round(ep * (1 + ITM_PCT / 100)) if sgn > 0 else round(ep * (1 - ITM_PCT / 100))
@@ -184,12 +210,13 @@ def main():
                                tail5=[x for x in b5 if x[0] > t_e]))
 
     out = [f"pollsim · {len(days)}거래일 · 거래 {len(trades)}건 · IV=VXN×{K_IV} · BSM 세타 내장",
-           "A=1분판정·tp체결(이상)  B=5분H/L·tp체결(낙관)  C=5분 종가만·종가체결(앱 현실)", ""]
+           "A=1분·tp체결(이상)  B=5분H/L·tp체결(낙관)  C=종가만(과비관)  D=앱 정확 재현", ""]
 
     modes = {
         "A": lambda t, T: run_hl(t["tail1"], t["t0"], t["ep"], t["tgt"], t["sgn"], T),
         "B": lambda t, T: run_hl(t["tail5"], t["t0"], t["ep"], t["tgt"], t["sgn"], T),
         "C": lambda t, T: run_poll(t["tail5"], t["t0"], t["ep"], t["tgt"], t["sgn"], T),
+        "D": lambda t, T: run_app(t["tail5"], t["t0"], t["ep"], t["tgt"], t["sgn"], T),
     }
     ops = {}
     for mk, fn in modes.items():
