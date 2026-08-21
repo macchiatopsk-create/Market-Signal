@@ -126,12 +126,20 @@
   "lo": -0.01
  },
  "2026-07-10": {
+<<<<<<< Updated upstream
   "ok": false,
   "bars": 300,
   "fails": [
    13
   ],
   "tries": 5
+=======
+  "ok": true,
+  "bars": 328,
+  "fails": [],
+  "hi": -0.125,
+  "lo": 0.005
+>>>>>>> Stashed changes
  },
  "2026-07-09": {
   "ok": true,
@@ -358,6 +366,7 @@
   "lo": 0.005
  },
  "2026-04-24": {
+<<<<<<< Updated upstream
   "ok": true,
   "bars": 330,
   "fails": [],
@@ -370,6 +379,23 @@
   "fails": [],
   "hi": -0.015,
   "lo": -0.005
+=======
+  "ok": false,
+  "bars": 270,
+  "fails": [
+   18
+  ],
+  "tries": 1
+ },
+ "2026-04-23": {
+  "ok": false,
+  "bars": 210,
+  "fails": [
+   16,
+   17
+  ],
+  "tries": 1
+>>>>>>> Stashed changes
  },
  "2026-04-22": {
   "ok": true,
@@ -405,6 +431,7 @@
   "fails": [],
   "hi": -0.905,
   "lo": 0.175
+<<<<<<< Updated upstream
  },
  "2026-04-10": {
   "ok": true,
@@ -421,5 +448,7 @@
    15
   ],
   "tries": 1
+=======
+>>>>>>> Stashed changes
  }
 }
