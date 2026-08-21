@@ -5,6 +5,9 @@ on:
       target:
         description: "실행할 스크립트 (all / v7 / v9 / v10 / vixts / premarket / credit / gapfill)"
         default: "all"
+  push:
+    paths:
+      - "gapafter.py"
 permissions:
   contents: write
 jobs:
@@ -19,6 +22,7 @@ jobs:
       - name: run selected
         run: |
           T="${{ github.event.inputs.target }}"
+          if [ -z "$T" ]; then T="gapafter"; fi
           run_one() { echo "== $1 =="; python "$1" || echo "FAIL $1"; }
           case "$T" in
             v7)        run_one v7_backtest.py ;;
