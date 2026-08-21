@@ -298,10 +298,9 @@
  },
  "2026-07-15": {
   "ok": false,
-  "bars": 300,
-  "fails": [
-   13
-  ],
+  "bars": 330,
+  "fails": [],
+  "reason": "range",
   "tries": 6
  },
  "2026-04-07": {
@@ -442,9 +441,7 @@
  "2026-02-20": {
   "ok": false,
   "bars": 270,
-  "fails": [
-   13
-  ],
+  "fails": [],
   "tries": 3
  },
  "2026-02-19": {
@@ -456,9 +453,69 @@
  "2026-02-12": {
   "ok": false,
   "bars": 270,
-  "fails": [
-   13
-  ],
+  "fails": [],
   "tries": 3
+ },
+ "2026-02-11": {
+  "ok": false,
+  "bars": 270,
+  "fails": [],
+  "tries": 1
+ },
+ "2026-02-06": {
+  "ok": false,
+  "bars": 270,
+  "fails": [],
+  "tries": 1
+ },
+ "2026-02-05": {
+  "ok": false,
+  "bars": 270,
+  "fails": [],
+  "tries": 1
+ },
+ "2026-02-04": {
+  "ok": false,
+  "bars": 270,
+  "fails": [],
+  "tries": 1
+ },
+ "2026-02-03": {
+  "ok": false,
+  "bars": 270,
+  "fails": [],
+  "tries": 1
+ },
+ "2026-01-28": {
+  "ok": false,
+  "bars": 270,
+  "fails": [],
+  "tries": 1
+ },
+ "2026-01-27": {
+  "ok": false,
+  "bars": 270,
+  "fails": [],
+  "tries": 1
+ },
+ "2026-01-22": {
+  "ok": false,
+  "bars": 270,
+  "fails": [],
+  "tries": 1
+ },
+ "2026-01-21": {
+  "ok": false,
+  "bars": 270,
+  "fails": [],
+  "tries": 1
+ },
+ "2026-01-16": {
+  "ok": false,
+  "bars": 210,
+  "fails": [
+   18
+  ],
+  "tries": 1
  }
 }
