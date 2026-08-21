@@ -1,6 +1,6 @@
 {
-  "at": "2026-08-21 17:49 UTC",
-  "report": "gs_quant=2.1.4\nstored QQQ 1m trading days=58\nRULES: gap 0.2~1.5% / |VIX open-prevclose|<5% / cover>=40% / first-bar close entry\n       no-fill 11:30 cut / after fill 0.15% trail / 14:00 final cut / fill bar excluded\nGS engine uses our QQQ minute CLOSE series and OrderAtMarket. Trail-hit exits execute at that minute's CLOSE,\nwhile IDEAL uses the exact theoretical stop price. Thus GS bar-close is an execution robustness cross-check.\n\n[5m] tradable n=5 / filled=4 / 11:30 no-fill=1 / prefilled-excluded=3\n  IDEAL stop fill : win=2/5 PF=0.50 avg=-0.069% med=-0.032% MDD=-0.574%\n  GS bar-close    : win=4/5 PF=1.30 avg=+0.034% med=+0.096% MDD=-0.574%\n  top1 removed PF : ideal=0.22 / close=0.57\n  top2 removed PF : ideal=0.00 / close=0.28\n  half PF         : ideal=0.00/0.61 / close=NA(no losses)/1.01\n  GS engine check : final=1.155000 absPnL=-98.845000\n                    manual=+1.155000 diff=-100.000000000000 matched=False\n\n[15m] tradable n=7 / filled=6 / 11:30 no-fill=1 / prefilled-excluded=8\n  IDEAL stop fill : win=6/7 PF=4.45 avg=+0.175% med=+0.137% MDD=-0.355%\n  GS bar-close    : win=3/7 PF=3.34 avg=+0.154% med=-0.005% MDD=-0.355%\n  top1 removed PF : ideal=2.88 / close=1.75\n  top2 removed PF : ideal=1.36 / close=0.56\n  half PF         : ideal=NA(no losses)/3.15 / close=2.52/3.57\n  GS engine check : final=7.515000 absPnL=-92.485000\n                    manual=+7.515000 diff=-100.000000000000 matched=False\n\n[1h] tradable n=3 / filled=2 / 11:30 no-fill=1 / prefilled-excluded=11\n  IDEAL stop fill : win=3/3 PF=NA(no losses) avg=+0.160% med=+0.158% MDD=0.000%\n  GS bar-close    : win=3/3 PF=NA(no losses) avg=+0.152% med=+0.158% MDD=0.000%\n  top1 removed PF : ideal=NA(no losses) / close=NA(no losses)\n  top2 removed PF : ideal=NA(no losses) / close=NA(no losses)\n  half PF         : ideal=NA(no losses)/NA(no losses) / close=NA(no losses)/NA(no losses)\n  GS engine check : final=3.250000 absPnL=-96.750000\n                    manual=+3.250000 diff=-100.000000000000 matched=False\n",
+  "at": "2026-08-21 17:51 UTC",
+  "report": "gs_quant=2.1.4\nstored QQQ 1m trading days=58\nRULES: gap 0.2~1.5% / |VIX open-prevclose|<5% / cover>=40% / first-bar close entry\n       no-fill 11:30 cut / after fill 0.15% trail / 14:00 final cut / fill bar excluded\nGS engine = independent order/fill/cash bookkeeping on our QQQ minute CLOSE series.\nGS bar-close = alternative exit: if trail is touched intrabar, execute at that minute close (not guaranteed better/worse).\n\n[5m] tradable n=5 / filled=4 / 11:30 no-fill=1 / prefilled-excluded=3\n  IDEAL stop fill : win=2/5 PF=0.50 avg=-0.069% med=-0.032% MDD=-0.574%\n  GS bar-close    : win=4/5 PF=1.30 avg=+0.034% med=+0.096% MDD=-0.574%\n  top1 removed PF : ideal=0.22 / close=0.57\n  top2 removed PF : ideal=0.00 / close=0.28\n  half PF         : ideal=0.00/0.61 / close=NA(no losses)/1.01\n  GS engine check : start=0.000000 final=1.155000 absPnL=+1.155000\n                    manual=+1.155000 diff=+0.000000000000 matched=True\n\n[15m] tradable n=7 / filled=6 / 11:30 no-fill=1 / prefilled-excluded=8\n  IDEAL stop fill : win=6/7 PF=4.45 avg=+0.175% med=+0.137% MDD=-0.355%\n  GS bar-close    : win=3/7 PF=3.34 avg=+0.154% med=-0.005% MDD=-0.355%\n  top1 removed PF : ideal=2.88 / close=1.75\n  top2 removed PF : ideal=1.36 / close=0.56\n  half PF         : ideal=NA(no losses)/3.15 / close=2.52/3.57\n  GS engine check : start=0.000000 final=7.515000 absPnL=+7.515000\n                    manual=+7.515000 diff=+0.000000000000 matched=True\n\n[1h] tradable n=3 / filled=2 / 11:30 no-fill=1 / prefilled-excluded=11\n  IDEAL stop fill : win=3/3 PF=NA(no losses) avg=+0.160% med=+0.158% MDD=0.000%\n  GS bar-close    : win=3/3 PF=NA(no losses) avg=+0.152% med=+0.158% MDD=0.000%\n  top1 removed PF : ideal=NA(no losses) / close=NA(no losses)\n  top2 removed PF : ideal=NA(no losses) / close=NA(no losses)\n  half PF         : ideal=NA(no losses)/NA(no losses) / close=NA(no losses)/NA(no losses)\n  GS engine check : start=0.000000 final=3.250000 absPnL=+3.250000\n                    manual=+3.250000 diff=+0.000000000000 matched=True\n",
   "tracks": {
     "5m": {
       "trades": [
@@ -88,11 +88,12 @@
       "prefilled_excluded": 3,
       "engine": {
         "ok": true,
+        "engine_start": 0.0,
         "engine_final": 1.1549999999999727,
-        "engine_abs_pnl": -98.84500000000003,
+        "engine_abs_pnl": 1.1549999999999727,
         "manual_abs_pnl": 1.1549999999999727,
-        "difference": -100.0,
-        "matched": false,
+        "difference": 0.0,
+        "matched": true,
         "orders": 10
       }
     },
@@ -214,11 +215,12 @@
       "prefilled_excluded": 8,
       "engine": {
         "ok": true,
+        "engine_start": 0.0,
         "engine_final": 7.5150000000001,
-        "engine_abs_pnl": -92.4849999999999,
+        "engine_abs_pnl": 7.5150000000001,
         "manual_abs_pnl": 7.5150000000001,
-        "difference": -100.0,
-        "matched": false,
+        "difference": 0.0,
+        "matched": true,
         "orders": 14
       }
     },
@@ -276,11 +278,12 @@
       "prefilled_excluded": 11,
       "engine": {
         "ok": true,
+        "engine_start": 0.0,
         "engine_final": 3.25,
-        "engine_abs_pnl": -96.75,
+        "engine_abs_pnl": 3.25,
         "manual_abs_pnl": 3.25,
-        "difference": -100.0,
-        "matched": false,
+        "difference": 0.0,
+        "matched": true,
         "orders": 6
       }
     }
