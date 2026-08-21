@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - "gsquant_fixed_sensitivity.py"
+      - ".github/workflows/gsquant-fixed-sensitivity.yml"
   workflow_dispatch:
 permissions:
   contents: write
