@@ -65,6 +65,7 @@ jobs:
             exitres)   run_one exitres.py ;;
             trailsweep) run_one trailsweep.py ;;
             minres)    run_one minres.py ;;
+            minres2)   run_one minres2.py ;;
             srcprobe)  run_one srcprobe.py ;;
             dukasval)  run_one dukasval.py ;;
             dukasfill) run_one dukasfill.py ;;
