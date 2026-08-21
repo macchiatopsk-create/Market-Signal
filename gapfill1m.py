@@ -132,9 +132,34 @@ def gap_days():
     return out
 
 
+def rebuild_status():
+    """상태파일이 깨졌을 때 데이터 파일(진실원)에서 재구성."""
+    st = {}
+    if os.path.isdir(DATA):
+        for f in sorted(os.listdir(DATA)):
+            if f.endswith(".csv.gz"):
+                try:
+                    d = pd.read_csv(f"{DATA}/{f}", compression="gzip")
+                    cnt = d.groupby(pd.to_datetime(d["ts"]).dt.date).size()
+                    for day, n in cnt.items():
+                        if n >= MIN_BARS:
+                            st[str(day)] = dict(ok=True, bars=int(n), fails=[])
+                except Exception:
+                    pass
+    return dict(sorted(st.items()))
+
+
 def load_status():
     p = f"{DATA}/_status.json"
-    return json.load(open(p)) if os.path.exists(p) else {}
+    if not os.path.exists(p):
+        return {}
+    try:
+        return json.load(open(p))
+    except Exception:
+        log("[경고] _status.json 파싱 실패 — 데이터 파일에서 재구성")
+        st = rebuild_status()
+        json.dump(st, open(p, "w"), ensure_ascii=False, indent=1)
+        return st
 
 
 def save_status(st):
