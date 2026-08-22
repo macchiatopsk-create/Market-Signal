@@ -49,14 +49,8 @@ def norm(d):
 
 
 def load_1m():
-    frames = [pd.read_csv(f, compression="gzip")
-              for f in sorted(glob.glob(f"{DATA}/QQQ_*.csv.gz"))]
-    df = pd.concat(frames, ignore_index=True)
-    df["t"] = pd.to_datetime(df["ts"])
-    df = df.drop_duplicates(subset=["ts"]).sort_values("t").set_index("t")
-    cnt = df.groupby(df.index.date).size()
-    okd = set(cnt[cnt >= 320].index)
-    return df[[d in okd for d in df.index.date]]
+    import combsim as _C
+    return _C.load_1m()          # 정규 330분 그리드 정본 로더 위임
 
 
 def hold_h(t, t0):

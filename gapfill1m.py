@@ -17,7 +17,7 @@ INST = "QQQUSUSD"
 SCALE = 1000.0
 DATA = "data/1m"
 HOURS = list(range(13, 19))     # UTC 13~18 = ET 09:00~14:59 (진입~14:00 최종컷 커버)
-MIN_BARS = 320                  # 정규장 09:30~15:00 = 330봉. 여유 10봉
+MIN_BARS = 200                  # 정규장 09:30~15:00 = 330봉. 여유 10봉
 DELAY = 0.9
 RETRY = 3
 BUDGET_SEC = 2300
@@ -36,7 +36,7 @@ def fetch_hour(day, h):
     for a in range(RETRY):
         try:
             req = urllib.request.Request(url, headers=UA)
-            with urllib.request.urlopen(req, timeout=35) as r:
+            with urllib.request.urlopen(req, timeout=8) as r:
                 return r.read()
         except urllib.error.HTTPError as e:
             if e.code == 404:

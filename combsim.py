@@ -50,14 +50,32 @@ def norm(d):
 
 
 def load_1m():
+    """월파일 로드 후 거래일별 09:30~14:59 정규 330분 그리드로 reindex+ffill.
+    틱 유래 결측분(무거래 분)을 평봉으로 메워 위치 인덱싱(iloc)이 시각과 정확 일치."""
     frames = [pd.read_csv(f, compression="gzip")
               for f in sorted(glob.glob(f"{DATA}/QQQ_*.csv.gz"))]
     df = pd.concat(frames, ignore_index=True)
     df["t"] = pd.to_datetime(df["ts"])
     df = df.drop_duplicates(subset=["ts"]).sort_values("t").set_index("t")
-    cnt = df.groupby(df.index.date).size()
-    okd = set(cnt[cnt >= 320].index)
-    return df[[d in okd for d in df.index.date]]
+    try:
+        _st = json.load(open(f"{DATA}/_status.json"))
+        _okd = {k for k, v in _st.items() if v.get("ok")}
+    except Exception:
+        _okd = None
+    out = []
+    for d, g in df.groupby(df.index.date):
+        if _okd is not None and str(d) not in _okd:
+            continue                          # 미완성일(부분캐시) 제외 — 완전성 권위는 status
+        if len(g) < 200:                      # 실봉 부족일 제외
+            continue
+        idx = pd.date_range(f"{d} 09:30", f"{d} 14:59", freq="1min")
+        g = g.reindex(idx)
+        c = g["Close"].ffill().bfill()   # 선행 결측(개장 첫 분 무틱)은 첫 실봉으로
+        for col in ("Open", "High", "Low", "Close"):
+            g[col] = g[col].fillna(c)
+        g["Volume"] = g["Volume"].fillna(0.0)
+        out.append(g[["Open", "High", "Low", "Close", "Volume"]])
+    return pd.concat(out)
 
 
 def agg(bars, k):
