@@ -19,7 +19,7 @@ DATA = "data/1m"
 HOURS = list(range(13, 19))     # UTC 13~18 = ET 09:00~14:59 (진입~14:00 최종컷 커버)
 MIN_BARS = 200                  # 정규장 09:30~15:00 = 330봉. 여유 10봉
 DELAY = 0.9
-RETRY = 3
+RETRY = 2
 BUDGET_SEC = 2300
 OUT = []
 
@@ -101,7 +101,7 @@ def day_bars(day, hours, deadline=None):
         if deadline and time.time() > deadline:
             fails.append(h)
             continue
-        if len(fails) >= 2 and not rows:
+        if len(fails) >= 1 and not rows:
             fails.append(h)              # 스로틀 버스트 — 날 포기, 예산 절약
             continue
         raw = fetch_hour(day, h)
@@ -230,6 +230,14 @@ def main():
     signal.signal(signal.SIGALRM, _watchdog)
     signal.alarm(BUDGET_SEC + 300)
     gd = gap_days()
+    gd_all = gd
+    shard = os.environ.get("SHARD", "")
+    if shard == "0":
+        gd = [g for g in gd if str(g[0]) >= "2025-03-01"]
+    elif shard == "1":
+        gd = [g for g in gd if str(g[0]) < "2025-03-01"]
+    if shard:
+        log(f"샤드 {shard}: 담당 {len(gd)}일 / 전체 {len(gd_all)}일")
     st = load_status()
     log(f"갭 거래일 {len(gd)}일 ({gd[0][0]} ~ {gd[-1][0]})")
     ok_n = sum(1 for k, v in st.items() if v.get("ok"))
@@ -283,11 +291,11 @@ def main():
 
     el = time.time() - t0
     log(f"이번 실행 {got}일 확보 · 소요 {el:.0f}초")
-    ok_n = sum(1 for k, v in st.items() if v.get("ok"))
-    left = len(gd) - ok_n
+    ok_n = sum(1 for k, v in st.items() if isinstance(v, dict) and v.get("ok"))
+    left = len(gd_all) - ok_n
     rate = (got / el * BUDGET_SEC) if el > 0 and got else 0
     eta = (left / rate) if rate else 0
-    log(f"누적 {ok_n}/{len(gd)}일 ({ok_n/len(gd)*100:.1f}%) · 남음 {left}일 · "
+    log(f"누적 {ok_n}/{len(gd_all)}일 (전역 {ok_n/len(gd_all)*100:.1f}%) · 남음 {left}일 · "
         f"이 속도면 {eta:.0f}회 실행 (35분 간격 → 약 {eta*35/60:.1f}시간)")
     if left <= 5 and not st.get("_recheck", {}).get("fired"):
         tok = os.environ.get("GH_TOKEN", "")

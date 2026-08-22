@@ -1,8 +1,8 @@
-name: backfill-1m
+name: backfill-1m-b
 
 on:
   schedule:
-    - cron: "*/35 * * * *"
+    - cron: "17,52 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -10,7 +10,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: backfill-1m
+  group: backfill-1m-b
   cancel-in-progress: false
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
       - name: run
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHARD: "0"
+          SHARD: "1"
         run: python gapfill1m.py
 
       - name: persist
@@ -51,4 +51,4 @@ jobs:
             git push && break || sleep $((i*5))
           done
         env:
-          SHARD: "0" 
+          SHARD: "1" 
