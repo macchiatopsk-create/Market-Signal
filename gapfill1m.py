@@ -41,6 +41,9 @@ def _read_capped(r, cap=10.0):
             raise TimeoutError("read cap")
 
 
+LAST_ERR = [""]
+
+
 def fetch_hour(day, h):
     url = (f"https://datafeed.dukascopy.com/datafeed/{INST}/"
            f"{day.year}/{day.month-1:02d}/{day.day:02d}/{h:02d}h_ticks.bi5")
@@ -49,7 +52,7 @@ def fetch_hour(day, h):
         try:
             req = urllib.request.Request(url, headers=UA)
             with urllib.request.urlopen(req, timeout=6) as r:
-                return _read_capped(r, cap=10.0)
+                return _read_capped(r, cap=25.0)
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return b""
@@ -58,7 +61,8 @@ def fetch_hour(day, h):
                 wait *= 1.8
                 continue
             return None
-        except Exception:
+        except Exception as e:
+            LAST_ERR[0] = f"{type(e).__name__}:{str(e)[:40]}"
             if a < RETRY - 1:
                 time.sleep(wait)
                 wait *= 1.8
@@ -274,7 +278,7 @@ def main():
         if n < MIN_BARS or fails:
             st[key] = dict(ok=False, bars=n, fails=fails, hours_ok=hok,
                            tries=prev.get("tries", 0) + 1)
-            rep.append(f"  {d} 갭{gp:+.2f}%  봉 {n:3d}  실패 {fails}  캐시 {len(hok)}/{len(need_all)}h")
+            rep.append(f"  {d} 갭{gp:+.2f}%  봉 {n:3d}  실패 {fails}  캐시 {len(hok)}/{len(need_all)}h  {LAST_ERR[0]}")
             save_status(st)
             continue
         # 일봉 대비 고저 괴리 — save_day가 반환한 병합 후 그 날 고저 사용
