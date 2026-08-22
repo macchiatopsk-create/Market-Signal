@@ -746,11 +746,10 @@
   "tries": 2
  },
  "2025-11-28": {
-  "ok": true,
+  "ok": false,
   "bars": 209,
   "fails": [],
-  "hi": -0.255,
-  "lo": -0.01
+  "reason": "halfday"
  },
  "2025-11-26": {
   "ok": true,
