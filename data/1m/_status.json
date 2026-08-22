@@ -917,17 +917,33 @@
  },
  "2025-10-30": {
   "ok": false,
-  "bars": 270,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 7
+  "bars": 60,
+  "fails": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "hours_ok": [
+   18
+  ],
+  "tries": 4
  },
  "2025-10-29": {
   "ok": false,
-  "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 7
+  "bars": 0,
+  "fails": [
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16
+  ],
+  "tries": 4
  },
  "2025-10-28": {
   "ok": true,
@@ -1137,10 +1153,18 @@
  },
  "2025-09-08": {
   "ok": false,
-  "bars": 30,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 6
+  "bars": 0,
+  "fails": [
+   13
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 3
  },
  "2025-09-05": {
   "ok": true,
