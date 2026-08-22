@@ -69,6 +69,7 @@ jobs:
             pollsim)   run_one pollsim.py ;;
             orbvwap)   run_one orbvwap.py ;;
             orbtrail)  run_one orbtrail.py ;;
+            orbc)      run_one orbc.py ;;
             ideatest)  run_one ideatest.py ;;
             srcprobe)  run_one srcprobe.py ;;
             dukasval)  run_one dukasval.py ;;
