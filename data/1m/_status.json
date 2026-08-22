@@ -298,9 +298,10 @@
  },
  "2026-07-15": {
   "ok": false,
-  "bars": 330,
-  "fails": [],
-  "reason": "range",
+  "bars": 270,
+  "fails": [
+   15
+  ],
   "tries": 21
  },
  "2026-04-07": {
@@ -409,64 +410,67 @@
   "lo": 0.045
  },
  "2026-03-06": {
-  "ok": false,
-  "bars": 240,
-  "fails": [
-   14
-  ],
-  "tries": 19
+  "ok": true,
+  "bars": 330,
+  "fails": [],
+  "hi": -0.01,
+  "lo": 0.24
  },
  "2026-03-05": {
   "ok": false,
-  "bars": 225,
-  "fails": [
-   14
-  ],
+  "bars": 315,
+  "fails": [],
   "tries": 19
  },
  "2026-03-04": {
   "ok": false,
-  "bars": 226,
+  "bars": 286,
   "fails": [],
   "tries": 19
  },
  "2026-02-27": {
-  "ok": false,
-  "bars": 270,
+  "ok": true,
+  "bars": 330,
   "fails": [],
-  "tries": 18
+  "hi": 0.005,
+  "lo": 0.005
  },
  "2026-02-25": {
-  "ok": false,
-  "bars": 270,
+  "ok": true,
+  "bars": 330,
   "fails": [],
-  "tries": 18
+  "hi": -0.47,
+  "lo": -0.04
  },
  "2026-02-20": {
-  "ok": false,
-  "bars": 270,
+  "ok": true,
+  "bars": 330,
   "fails": [],
-  "tries": 17
+  "hi": -0.005,
+  "lo": 0.03
  },
  "2026-02-19": {
-  "ok": false,
-  "bars": 270,
+  "ok": true,
+  "bars": 330,
   "fails": [],
-  "tries": 17
+  "hi": -0.005,
+  "lo": 0.005
  },
  "2026-02-12": {
   "ok": false,
   "bars": 270,
   "fails": [
-   13
+   18
   ],
-  "tries": 15
+  "tries": 16
  },
  "2026-02-11": {
   "ok": false,
   "bars": 270,
-  "fails": [],
-  "tries": 10
+  "fails": [
+   19
+  ],
+  "tries": 11
  },
  "2026-02-06": {
   "ok": false,
