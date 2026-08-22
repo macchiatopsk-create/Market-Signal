@@ -72,6 +72,7 @@ jobs:
             orbc)      run_one orbc.py ;;
             orbvix)    run_one orbvix.py ;;
             qqqnight)  run_one qqqnight.py ;;
+            combsim)   run_one combsim.py ;;
             ideatest)  run_one ideatest.py ;;
             srcprobe)  run_one srcprobe.py ;;
             dukasval)  run_one dukasval.py ;;
