@@ -216,6 +216,16 @@ def save_day(d, bars, replace=True):
 def main():
     os.makedirs(DATA, exist_ok=True)
     t0 = time.time()
+    import signal
+    def _watchdog(signum, frame):
+        import traceback as _tb
+        OUT.append("⏰ 워치독 발동 — 행 지점 스택:\n" + "".join(_tb.format_stack(frame))[-1500:])
+        json.dump({"at": dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+                   "report": "\n".join(OUT)},
+                  open("gapfill1m_result.json", "w"), ensure_ascii=False, indent=1)
+        os._exit(0)
+    signal.signal(signal.SIGALRM, _watchdog)
+    signal.alarm(BUDGET_SEC + 300)
     gd = gap_days()
     st = load_status()
     log(f"갭 거래일 {len(gd)}일 ({gd[0][0]} ~ {gd[-1][0]})")
