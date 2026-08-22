@@ -18,8 +18,8 @@ SCALE = 1000.0
 DATA = "data/1m"
 HOURS = list(range(13, 19))     # UTC 13~18 = ET 09:00~14:59 (진입~14:00 최종컷 커버)
 MIN_BARS = 320                  # 정규장 09:30~15:00 = 330봉. 여유 10봉
-DELAY = 1.2
-RETRY = 5
+DELAY = 0.9
+RETRY = 3
 BUDGET_SEC = 2300
 OUT = []
 
@@ -83,9 +83,9 @@ def day_hours(day):
     return [h - off for h in range(9, 15)]
 
 
-def day_bars(day):
+def day_bars(day, hours):
     rows, fails = [], []
-    for h in day_hours(day):
+    for h in hours:
         raw = fetch_hour(day, h)
         if raw is None:
             fails.append(h)
@@ -175,18 +175,27 @@ def save_status(st):
     json.dump(st, open(f"{DATA}/_status.json", "w"), ensure_ascii=False, indent=1)
 
 
-def save_day(d, bars):
+def save_day(d, bars, replace=True):
+    """봉을 월파일에 기록. replace=False면 그 날 기존 봉과 병합(시간대 캐시).
+    반환: (그 날 봉수, 그 날 High, 그 날 Low)."""
     path = f"{DATA}/QQQ_{d.year}-{d.month:02d}.csv.gz"
     b = bars.copy()
-    b.insert(0, "ts", b.index.strftime("%Y-%m-%d %H:%M"))
-    b = b.reset_index(drop=True)
+    if len(b):
+        b.insert(0, "ts", b.index.strftime("%Y-%m-%d %H:%M"))
+        b = b.reset_index(drop=True)
+    else:
+        b = pd.DataFrame(columns=["ts", "Open", "High", "Low", "Close", "Volume"])
     if os.path.exists(path):
         old = pd.read_csv(path, compression="gzip")
-        old = old[~pd.to_datetime(old["ts"]).dt.date.eq(d)]
+        if replace:
+            old = old[~pd.to_datetime(old["ts"]).dt.date.eq(d)]
         b = pd.concat([old, b], ignore_index=True)
     b = b.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
     b.to_csv(path, index=False, compression="gzip")
-    return path, len(b)
+    m = b[pd.to_datetime(b["ts"]).dt.date.eq(d)]
+    if not len(m):
+        return 0, 0.0, 0.0
+    return len(m), float(m["High"].max()), float(m["Low"].min())
 
 
 def main():
@@ -206,25 +215,33 @@ def main():
         if time.time() - t0 > BUDGET_SEC:
             log(f"  [시간예산 초과 — {d} 이전 중단]")
             break
-        bars, fails = day_bars(d)
-        n = len(bars)
         key = str(d)
+        prev = st.get(key, {})
+        if prev.get("reason") == "range" and prev.get("tries", 0) >= 3:
+            continue
+        if prev.get("tries", 0) >= 8 and not prev.get("fails"):
+            continue                     # 만성 결손일 파킹 — 종료 후 수동 검토
+        need_all = day_hours(d)
+        hok = [h for h in prev.get("hours_ok", []) if h in need_all]
+        need = [h for h in need_all if h not in hok]
+        bars, fails = day_bars(d, need)
+        hok = sorted(set(hok) | (set(need) - set(fails)))
+        n, dh, dl = save_day(d, bars, replace=(not prev.get("hours_ok")))
+        if not fails and not need and n < MIN_BARS:
+            hok = []                     # 캐시 불일치 → 다음 런 전체 재수집
         if n < MIN_BARS or fails:
-            st[key] = dict(ok=False, bars=n, fails=fails,
-                           tries=st.get(key, {}).get("tries", 0) + 1)
-            rep.append(f"  {d} 갭{gp:+.2f}%  봉 {n:3d}  실패시간 {fails}  → 미완료(재시도 대상)")
+            st[key] = dict(ok=False, bars=n, fails=fails, hours_ok=hok,
+                           tries=prev.get("tries", 0) + 1)
+            rep.append(f"  {d} 갭{gp:+.2f}%  봉 {n:3d}  실패 {fails}  캐시 {len(hok)}/{len(need_all)}h")
             save_status(st)
             continue
-        dh, dl = float(bars["High"].max()), float(bars["Low"].min())
-        dev = max(abs(dh - rh), abs(dl - rl))
-        # 일봉 대비 고저 괴리 (15:00 컷이라 종가는 비교 안 함)
+        # 일봉 대비 고저 괴리 — save_day가 반환한 병합 후 그 날 고저 사용
         if dh > rh + 0.05 or dl < rl - 0.05:
             rep.append(f"  {d} 갭{gp:+.2f}%  봉 {n:3d}  일봉범위 이탈 고{dh-rh:+.3f} 저{dl-rl:+.3f} → 보류")
             st[key] = dict(ok=False, bars=n, fails=[], reason="range",
                            tries=st.get(key, {}).get("tries", 0) + 1)
             save_status(st)
             continue
-        path, tot = save_day(d, bars)
         st[key] = dict(ok=True, bars=n, fails=[], hi=round(dh - rh, 3), lo=round(dl - rl, 3))
         save_status(st)
         rep.append(f"  {d} 갭{gp:+.2f}%  봉 {n:3d}  고{dh-rh:+.3f} 저{dl-rl:+.3f}  저장")
