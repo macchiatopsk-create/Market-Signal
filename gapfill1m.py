@@ -74,9 +74,18 @@ def decode_bi5(raw):
     return [struct.unpack(">iiiff", data[i*20:(i+1)*20]) for i in range(len(data)//20)]
 
 
+def day_hours(day):
+    """ET 09:00~14:59를 그 날짜의 실제 UTC 오프셋으로 환산 (EDT 13~18 / EST 14~19)."""
+    from zoneinfo import ZoneInfo
+    off = int(dt.datetime(day.year, day.month, day.day, 12,
+                          tzinfo=ZoneInfo("America/New_York"))
+              .utcoffset().total_seconds() // 3600)      # -4 또는 -5
+    return [h - off for h in range(9, 15)]
+
+
 def day_bars(day):
     rows, fails = [], []
-    for h in HOURS:
+    for h in day_hours(day):
         raw = fetch_hour(day, h)
         if raw is None:
             fails.append(h)
