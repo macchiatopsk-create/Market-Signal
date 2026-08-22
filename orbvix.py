@@ -136,16 +136,16 @@ def stat(rows):
 def main():
     if _bs is None:
         return ["py_vollib 미설치"]
-    v = norm(yf.Ticker("^VIX").history(period="8mo")[["Open", "Close"]].dropna())
+    v = norm(yf.Ticker("^VIX").history(period="26mo")[["Open", "Close"]].dropna())
     ch = (v["Open"] / v["Close"].shift(1) - 1) * 100
     vm = {str(pd.Timestamp(k).date()): float(x) for k, x in ch.dropna().items()}
     try:
-        x = norm(yf.Ticker("^VXN").history(period="8mo")[["Open"]].dropna())
+        x = norm(yf.Ticker("^VXN").history(period="26mo")[["Open"]].dropna())
         ivm = {str(pd.Timestamp(k).date()): float(r) / 100 for k, r in x["Open"].items()}
     except Exception:
         ivm = {}
     vox = {str(pd.Timestamp(k).date()): float(r) for k, r in v["Open"].items()}
-    dd = norm(yf.download("QQQ", period="8mo", interval="1d",
+    dd = norm(yf.download("QQQ", period="26mo", interval="1d",
                           auto_adjust=False, progress=False))
     if isinstance(dd.columns, pd.MultiIndex):
         dd.columns = dd.columns.get_level_values(0)
