@@ -20,16 +20,16 @@ T_SIG, T_FINAL = dt.time(9, 45), dt.time(14, 0)
 
 
 def build_universe():
-    v = C.norm(yf.Ticker("^VIX").history(period="8mo")[["Open", "Close"]].dropna())
+    v = C.norm(yf.Ticker("^VIX").history(period="26mo")[["Open", "Close"]].dropna())
     ch = (v["Open"] / v["Close"].shift(1) - 1) * 100
     vm = {pd.Timestamp(k).date(): float(x) for k, x in ch.dropna().items()}
     try:
-        x = C.norm(yf.Ticker("^VXN").history(period="8mo")[["Open"]].dropna())
+        x = C.norm(yf.Ticker("^VXN").history(period="26mo")[["Open"]].dropna())
         ivm = {str(pd.Timestamp(k).date()): float(r) / 100 for k, r in x["Open"].items()}
     except Exception:
         ivm = {}
     vox = {str(pd.Timestamp(k).date()): float(r) for k, r in v["Open"].items()}
-    dd = C.norm(yf.download("QQQ", period="8mo", interval="1d",
+    dd = C.norm(yf.download("QQQ", period="26mo", interval="1d",
                             auto_adjust=False, progress=False))
     if isinstance(dd.columns, pd.MultiIndex):
         dd.columns = dd.columns.get_level_values(0)
