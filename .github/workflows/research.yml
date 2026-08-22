@@ -76,6 +76,7 @@ jobs:
             gsbt)      run_one gsbt.py ;;
             gs2)       run_one gs2.py ;;
             vbsweep)   run_one vbsweep.py ;;
+            recheck)   run_one combsim.py ; run_one orbvix.py ; run_one vbsweep.py ; run_one minres2.py ;;
             ideatest)  run_one ideatest.py ;;
             srcprobe)  run_one srcprobe.py ;;
             dukasval)  run_one dukasval.py ;;

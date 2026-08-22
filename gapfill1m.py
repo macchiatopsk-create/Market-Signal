@@ -255,6 +255,24 @@ def main():
     eta = (left / rate) if rate else 0
     log(f"누적 {ok_n}/{len(gd)}일 ({ok_n/len(gd)*100:.1f}%) · 남음 {left}일 · "
         f"이 속도면 {eta:.0f}회 실행 (35분 간격 → 약 {eta*35/60:.1f}시간)")
+    if left <= 5 and not st.get("_recheck", {}).get("fired"):
+        import os
+        tok = os.environ.get("GH_TOKEN", "")
+        if tok:
+            try:
+                req = urllib.request.Request(
+                    "https://api.github.com/repos/macchiatopsk-create/"
+                    "Market-Signal/actions/workflows/research.yml/dispatches",
+                    data=json.dumps({"ref": "main",
+                                     "inputs": {"target": "recheck"}}).encode(),
+                    headers={"Authorization": f"Bearer {tok}",
+                             "Accept": "application/vnd.github+json"})
+                urllib.request.urlopen(req, timeout=15)
+                st["_recheck"] = {"fired": True}
+                save_status(st)
+                log("★ 백필 사실상 완료 — 재심 배터리(recheck) 자동 발사")
+            except Exception as e:
+                log(f"recheck 자동발사 실패: {e}")
     log("")
     for r in rep:
         log(r)
