@@ -256,7 +256,6 @@ def main():
     log(f"누적 {ok_n}/{len(gd)}일 ({ok_n/len(gd)*100:.1f}%) · 남음 {left}일 · "
         f"이 속도면 {eta:.0f}회 실행 (35분 간격 → 약 {eta*35/60:.1f}시간)")
     if left <= 5 and not st.get("_recheck", {}).get("fired"):
-        import os
         tok = os.environ.get("GH_TOKEN", "")
         if tok:
             try:
