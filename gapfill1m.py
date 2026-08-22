@@ -29,15 +29,27 @@ def log(s):
     OUT.append(s)
 
 
+def _read_capped(r, cap=10.0):
+    """슬로우드립 스로틀 방어: 전체 읽기에 벽시계 상한."""
+    buf, t0 = b"", time.time()
+    while True:
+        chunk = r.read(65536)
+        if not chunk:
+            return buf
+        buf += chunk
+        if time.time() - t0 > cap:
+            raise TimeoutError("read cap")
+
+
 def fetch_hour(day, h):
     url = (f"https://datafeed.dukascopy.com/datafeed/{INST}/"
            f"{day.year}/{day.month-1:02d}/{day.day:02d}/{h:02d}h_ticks.bi5")
-    wait = 2.0
+    wait = 1.5
     for a in range(RETRY):
         try:
             req = urllib.request.Request(url, headers=UA)
-            with urllib.request.urlopen(req, timeout=8) as r:
-                return r.read()
+            with urllib.request.urlopen(req, timeout=6) as r:
+                return _read_capped(r, cap=10.0)
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return b""
@@ -83,9 +95,12 @@ def day_hours(day):
     return [h - off for h in range(9, 15)]
 
 
-def day_bars(day, hours):
+def day_bars(day, hours, deadline=None):
     rows, fails = [], []
     for h in hours:
+        if deadline and time.time() > deadline:
+            fails.append(h)
+            continue
         raw = fetch_hour(day, h)
         if raw is None:
             fails.append(h)
@@ -224,7 +239,7 @@ def main():
         need_all = day_hours(d)
         hok = [h for h in prev.get("hours_ok", []) if h in need_all]
         need = [h for h in need_all if h not in hok]
-        bars, fails = day_bars(d, need)
+        bars, fails = day_bars(d, need, deadline=t0 + BUDGET_SEC + 240)
         hok = sorted(set(hok) | (set(need) - set(fails)))
         n, dh, dl = save_day(d, bars, replace=(not prev.get("hours_ok")))
         if not fails and not need and n < MIN_BARS:
