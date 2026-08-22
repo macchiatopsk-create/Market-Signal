@@ -298,12 +298,11 @@
  },
  "2026-07-15": {
   "ok": false,
-  "bars": 240,
+  "bars": 270,
   "fails": [
-   13,
-   14
+   15
   ],
-  "tries": 16
+  "tries": 17
  },
  "2026-04-07": {
   "ok": true,
@@ -414,47 +413,50 @@
   "ok": false,
   "bars": 270,
   "fails": [],
-  "tries": 14
+  "tries": 15
  },
  "2026-03-05": {
   "ok": false,
-  "bars": 195,
-  "fails": [
-   18
-  ],
-  "tries": 14
+  "bars": 255,
+  "fails": [],
+  "tries": 15
  },
  "2026-03-04": {
   "ok": false,
   "bars": 226,
-  "fails": [],
-  "tries": 14
+  "fails": [
+   13
+  ],
+  "tries": 15
  },
  "2026-02-27": {
   "ok": false,
   "bars": 270,
   "fails": [],
-  "tries": 13
+  "tries": 14
  },
  "2026-02-25": {
   "ok": false,
   "bars": 270,
   "fails": [],
-  "tries": 13
+  "tries": 14
  },
  "2026-02-20": {
   "ok": false,
-  "bars": 240,
+  "bars": 270,
   "fails": [
-   14
+   13
   ],
-  "tries": 13
+  "tries": 14
  },
  "2026-02-19": {
   "ok": false,
-  "bars": 270,
-  "fails": [],
-  "tries": 13
+  "bars": 240,
+  "fails": [
+   13,
+   14
+  ],
+  "tries": 14
  },
  "2026-02-12": {
   "ok": false,
