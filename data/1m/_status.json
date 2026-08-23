@@ -1468,9 +1468,17 @@
  "2024-12-24": {
   "ok": false,
   "bars": 209,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 18
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 15
  },
  "2024-12-20": {
   "ok": true,
