@@ -836,9 +836,17 @@
  "2025-11-06": {
   "ok": false,
   "bars": 240,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 14
+  "fails": [
+   17
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   18,
+   19
+  ],
+  "tries": 11
  },
  "2025-11-03": {
   "ok": true,
