@@ -2308,10 +2308,18 @@
  },
  "2025-07-03": {
   "ok": false,
-  "bars": 209,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 9
+  "bars": 30,
+  "fails": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "hours_ok": [
+   13
+  ],
+  "tries": 6
  },
  "2025-07-01": {
   "ok": true,
