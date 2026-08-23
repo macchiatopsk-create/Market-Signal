@@ -299,9 +299,17 @@
  "2026-07-15": {
   "ok": false,
   "bars": 330,
-  "fails": [],
-  "reason": "range",
-  "tries": 34
+  "fails": [
+   15,
+   17
+  ],
+  "hours_ok": [
+   13,
+   14,
+   16,
+   18
+  ],
+  "tries": 33
  },
  "2026-04-07": {
   "ok": true,
