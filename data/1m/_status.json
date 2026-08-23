@@ -1059,9 +1059,17 @@
  "2025-09-08": {
   "ok": false,
   "bars": 30,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 15
+  "fails": [
+   13
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 12
  },
  "2025-09-05": {
   "ok": true,
