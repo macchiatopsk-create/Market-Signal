@@ -1064,10 +1064,18 @@
  },
  "2025-08-04": {
   "ok": false,
-  "bars": 270,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 43
+  "bars": 210,
+  "fails": [
+   16
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   17,
+   18
+  ],
+  "tries": 40
  },
  "2025-08-01": {
   "ok": true,
@@ -1708,9 +1716,17 @@
  "2025-07-03": {
   "ok": false,
   "bars": 209,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 40
+  "fails": [
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16
+  ],
+  "tries": 37
  },
  "2025-07-01": {
   "ok": true,
