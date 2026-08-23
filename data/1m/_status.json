@@ -1852,10 +1852,18 @@
  },
  "2024-10-23": {
   "ok": false,
-  "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 12
+  "bars": 0,
+  "fails": [
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16
+  ],
+  "tries": 9
  },
  "2024-10-22": {
   "ok": false,
