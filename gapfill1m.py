@@ -252,6 +252,7 @@ def main():
     todo = sorted(todo, key=lambda g: (st.get(str(g[0]), {}).get("tries", 0),
                                        -g[0].toordinal()))  # 신규(tries=0) 우선, 그 안에선 최신 우선
     got, rep = 0, []
+    dead = 0                         # 연속 전멸일 (서킷브레이커)
     for (d, gp, pc, rh, rl, rc) in todo:
         if time.time() - t0 > BUDGET_SEC:
             log(f"  [시간예산 초과 — {d} 이전 중단]")
@@ -281,6 +282,13 @@ def main():
                            tries=prev.get("tries", 0) + 1)
             rep.append(f"  {d} 갭{gp:+.2f}%  봉 {n:3d}  실패 {fails}  캐시 {len(hok)}/{len(need_all)}h  {LAST_ERR[0]}")
             save_status(st)
+            if fails and set(need) <= set(fails):
+                dead += 1
+                if dead >= 6:
+                    log(f"  [연속 전멸 {dead}일 — 스로틀 교살 추정, 런 조기 종료 → 다음 크론 새 IP]")
+                    break
+            else:
+                dead = 0
             continue
         # 일봉 대비 고저 괴리 — save_day가 반환한 병합 후 그 날 고저 사용
         if dh > rh + 0.05 or dl < rl - 0.05:
@@ -293,6 +301,7 @@ def main():
         save_status(st)
         rep.append(f"  {d} 갭{gp:+.2f}%  봉 {n:3d}  고{dh-rh:+.3f} 저{dl-rl:+.3f}  저장")
         got += 1
+        dead = 0
 
     el = time.time() - t0
     log(f"이번 실행 {got}일 확보 · 소요 {el:.0f}초")
