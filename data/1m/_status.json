@@ -1634,9 +1634,17 @@
  "2025-07-03": {
   "ok": false,
   "bars": 209,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 10
+  "fails": [
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16
+  ],
+  "tries": 7
  },
  "2025-07-01": {
   "ok": true,
@@ -1879,9 +1887,17 @@
  "2025-03-14": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 9
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 6
  },
  "2025-03-07": {
   "ok": true,
