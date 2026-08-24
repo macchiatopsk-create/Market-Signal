@@ -45,16 +45,16 @@ def opt_pl(sgn, ep, exit_px, t0, hold, iv):
 def main():
     if _bs is None:
         return ["py_vollib 미설치"]
-    v = norm(yf.Ticker("^VIX").history(period="26mo")[["Open", "Close"]].dropna())
+    v = norm(yf.Ticker("^VIX").history(period="5y")[["Open", "Close"]].dropna())
     ch = (v["Open"] / v["Close"].shift(1) - 1) * 100
     vm = {str(pd.Timestamp(k).date()): float(x) for k, x in ch.dropna().items()}
     try:
-        x = norm(yf.Ticker("^VXN").history(period="26mo")[["Open"]].dropna())
+        x = norm(yf.Ticker("^VXN").history(period="5y")[["Open"]].dropna())
         ivm = {str(pd.Timestamp(k).date()): float(r) / 100 * K_MAIN for k, r in x["Open"].items()}
     except Exception:
         ivm = {}
     vix_open = {str(pd.Timestamp(k).date()): float(r) for k, r in v["Open"].items()}
-    dd = norm(yf.download("QQQ", period="26mo", interval="1d", auto_adjust=False, progress=False))
+    dd = norm(yf.download("QQQ", period="5y", interval="1d", auto_adjust=False, progress=False))
     if isinstance(dd.columns, pd.MultiIndex):
         dd.columns = dd.columns.get_level_values(0)
     closes = {pd.Timestamp(k).date(): float(r) for k, r in dd["Close"].items()}
@@ -119,10 +119,10 @@ def main():
                 return 0.0, 100.0, n_exec
         return eq, mdd, n_exec
 
-    segs = [("1년차 24-08~25-08", [t for t in trades if t["d"] <= Y1_END]),
-            ("2년차 25-08~26-08", [t for t in trades if t["d"] > Y1_END]),
-            ("2026 YTD 1~8월", [t for t in trades if t["d"] >= dt.date(2026, 1, 1)]),
-            ("전체 26개월", trades)]
+    years = sorted({t["d"].year for t in trades})
+    segs = [(f"{y}년" + (" YTD" if y == max(years) else ""),
+             [t for t in trades if t["d"].year == y]) for y in years]
+    segs.append((f"전체 {len(years)}개년", trades))
     for name, trs in segs:
         wins = sum(1 for t in trs if t["pl"] > 0)
         avg_p0 = sum(t["p0"] for t in trs) / max(len(trs), 1)

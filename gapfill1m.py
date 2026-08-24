@@ -297,7 +297,9 @@ def main():
     el = time.time() - t0
     log(f"이번 실행 {got}일 확보 · 소요 {el:.0f}초")
     ok_n = sum(1 for k, v in st.items() if isinstance(v, dict) and v.get("ok"))
-    left = len(gd_all) - ok_n
+    parked = sum(1 for k, v in st.items() if isinstance(v, dict) and not v.get("ok")
+                 and (v.get("tries", 0) >= 8 or v.get("reason") in ("range", "halfday")))
+    left = len(gd_all) - ok_n - parked
     rate = (got / el * BUDGET_SEC) if el > 0 and got else 0
     eta = (left / rate) if rate else 0
     log(f"누적 {ok_n}/{len(gd_all)}일 (전역 {ok_n/len(gd_all)*100:.1f}%) · 남음 {left}일 · "

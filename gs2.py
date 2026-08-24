@@ -40,10 +40,10 @@ def build():
     cnt = df.groupby(df.index.date).size()
     df = df[[d in set(cnt[cnt >= 320].index) for d in df.index.date]]
     days = sorted(set(df.index.date))
-    v = norm(yf.Ticker("^VIX").history(period="26mo")[["Open", "Close"]].dropna())
+    v = norm(yf.Ticker("^VIX").history(period="5y")[["Open", "Close"]].dropna())
     ch = (v["Open"] / v["Close"].shift(1) - 1) * 100
     vm = {pd.Timestamp(k).date(): float(x) for k, x in ch.dropna().items()}
-    dd = norm(yf.download("QQQ", period="26mo", interval="1d",
+    dd = norm(yf.download("QQQ", period="5y", interval="1d",
                           auto_adjust=False, progress=False))
     if isinstance(dd.columns, pd.MultiIndex):
         dd.columns = dd.columns.get_level_values(0)
