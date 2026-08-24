@@ -20,7 +20,7 @@ HOURS = list(range(13, 19))     # UTC 13~18 = ET 09:00~14:59 (진입~14:00 최�
 MIN_BARS = 200                  # 정규장 09:30~15:00 = 330봉. 여유 10봉
 DELAY = 0.9
 RETRY = 2
-BUDGET_SEC = 2300
+BUDGET_SEC = 1500
 OUT = []
 
 
