@@ -299,9 +299,17 @@
  "2026-07-15": {
   "ok": false,
   "bars": 330,
-  "fails": [],
-  "reason": "range",
-  "tries": 7
+  "fails": [
+   17
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   18
+  ],
+  "tries": 6
  },
  "2026-04-07": {
   "ok": true,
@@ -635,9 +643,17 @@
  "2025-12-04": {
   "ok": false,
   "bars": 330,
-  "fails": [],
-  "reason": "range",
-  "tries": 7
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 6
  },
  "2025-12-03": {
   "ok": false,
@@ -928,9 +944,17 @@
  "2025-09-08": {
   "ok": false,
   "bars": 30,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 9
+  "fails": [
+   13
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 6
  },
  "2025-09-05": {
   "ok": true,
