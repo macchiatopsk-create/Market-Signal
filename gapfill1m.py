@@ -131,8 +131,8 @@ def day_bars(day, hours, deadline=None):
 
 
 def gap_days():
-    """2년 일봉으로 갭 0.2~1.5% & 개장VIX|x|<5% 인 날 목록."""
-    v = yf.Ticker("^VIX").history(period="2y")[["Open", "Close"]].dropna()
+    """2022-01~ 일봉으로 갭 0.2~1.5% & 개장VIX|x|<5% 인 날 목록."""
+    v = yf.Ticker("^VIX").history(start="2021-12-15")[["Open", "Close"]].dropna()
     try:
         v.index = v.index.tz_localize(None)
     except Exception:
@@ -141,7 +141,7 @@ def gap_days():
     vch = (v["Open"] / v["Close"].shift(1) - 1) * 100
     vm = {str(pd.Timestamp(k).date()): float(x) for k, x in vch.dropna().items()}
 
-    d = yf.download("QQQ", period="2y", interval="1d", auto_adjust=False, progress=False)
+    d = yf.download("QQQ", start="2021-12-15", interval="1d", auto_adjust=False, progress=False)
     if isinstance(d.columns, pd.MultiIndex):
         d.columns = d.columns.get_level_values(0)
     d = d.dropna()
@@ -237,9 +237,9 @@ def main():
     gd_all = gd
     shard = os.environ.get("SHARD", "")
     if shard == "0":
-        gd = [g for g in gd if str(g[0]) >= "2025-03-01"]
+        gd = [g for g in gd if str(g[0]) >= "2023-05-01"]
     elif shard == "1":
-        gd = [g for g in gd if str(g[0]) < "2025-03-01"]
+        gd = [g for g in gd if str(g[0]) < "2023-05-01"]
     if shard:
         log(f"샤드 {shard}: 담당 {len(gd)}일 / 전체 {len(gd_all)}일")
     st = load_status()
