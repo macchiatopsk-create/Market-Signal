@@ -24,7 +24,7 @@ except Exception:
 COVER_MIN = 0.40
 ENTRY_DEADLINE = dt.time(11, 30)
 FINALCUT = dt.time(14, 0)
-TRAILS = [0.10, 0.20, 0.30, 0.40]
+TRAILS = [0.10, 0.20, 0.25, 0.30, 0.35, 0.40]
 ITM_PCT, SPREAD, RFR, K_IV = 0.50, 2.2, 0.045, 1.3
 DATA = "data/1m"
 
