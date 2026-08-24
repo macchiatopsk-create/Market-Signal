@@ -299,9 +299,17 @@
  "2026-07-15": {
   "ok": false,
   "bars": 330,
-  "fails": [],
-  "reason": "range",
-  "tries": 69
+  "fails": [
+   17
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   18
+  ],
+  "tries": 68
  },
  "2026-04-07": {
   "ok": true,
@@ -607,9 +615,17 @@
  "2025-12-12": {
   "ok": false,
   "bars": 270,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 50
+  "fails": [
+   16
+  ],
+  "hours_ok": [
+   14,
+   15,
+   17,
+   18,
+   19
+  ],
+  "tries": 47
  },
  "2025-12-09": {
   "ok": true,
