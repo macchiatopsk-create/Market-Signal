@@ -1,4 +1,4 @@
 {
- "at": "2026-08-24 18:15 UTC",
- "report": "샤드 1: 담당 70일 / 전체 274일\n갭 거래일 70일 (2024-08-27 ~ 2025-02-27)\n확보 완료 258일 · 남음 -188일\n\n이번 실행 0일 확보 · 소요 51초\n누적 258/274일 (전역 94.2%) · 남음 16일 · 이 속도면 0회 실행 (35분 간격 → 약 0.0시간)\n\n  2025-02-21 갭+0.21%  봉 330  실패 [19]  캐시 5/6h  URLError:<urlopen error _ssl.c:993: The handshake\n  2024-12-24 갭+0.38%  봉 209  실패 [19]  캐시 5/6h  URLError:<urlopen error timed out>\n  2024-10-23 갭-0.48%  봉 120  실패 [18]  캐시 5/6h  URLError:<urlopen error timed out>"
+ "at": "2026-08-24 18:58 UTC",
+ "report": "샤드 1: 담당 70일 / 전체 274일\n갭 거래일 70일 (2024-08-27 ~ 2025-02-27)\n확보 완료 258일 · 남음 -188일\n\n이번 실행 0일 확보 · 소요 19초\n누적 258/274일 (전역 94.2%) · 남음 16일 · 이 속도면 0회 실행 (35분 간격 → 약 0.0시간)\n\n  2025-02-21 갭+0.21%  봉 330  실패 [19]  캐시 5/6h  TimeoutError:The read operation timed out\n  2024-12-24 갭+0.38%  봉 209  실패 [19]  캐시 5/6h  TimeoutError:The read operation timed out\n  2024-10-23 갭-0.48%  봉 120  실패 [18]  캐시 5/6h  TimeoutError:The read operation timed out"
 }
