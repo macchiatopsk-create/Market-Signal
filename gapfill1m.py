@@ -249,7 +249,8 @@ def main():
     log("")
 
     todo = [g for g in gd if not st.get(str(g[0]), {}).get("ok")]
-    todo = sorted(todo, key=lambda g: g[0], reverse=True)
+    todo = sorted(todo, key=lambda g: (st.get(str(g[0]), {}).get("tries", 0),
+                                       -g[0].toordinal()))  # 신규(tries=0) 우선, 그 안에선 최신 우선
     got, rep = 0, []
     for (d, gp, pc, rh, rl, rc) in todo:
         if time.time() - t0 > BUDGET_SEC:
