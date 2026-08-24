@@ -267,7 +267,7 @@ def main():
         bars, fails = day_bars(d, need, deadline=t0 + BUDGET_SEC + 240)
         hok = sorted(set(hok) | (set(need) - set(fails)))
         n, dh, dl = save_day(d, bars, replace=(not prev.get("hours_ok")))
-        if not fails and n < 300 and set(hok) == set(need_all):
+        if not fails and n < 250 and set(hok) == set(need_all):
             st[key] = dict(ok=False, bars=n, fails=[], reason="halfday",
                            tries=prev.get("tries", 0) + 3)
             rep.append(f"  {d} 갭{gp:+.2f}%  봉 {n:3d}  조기폐장 추정 → 유니버스 퇴출")
