@@ -121,6 +121,7 @@ def main():
 
     segs = [("1년차 24-08~25-08", [t for t in trades if t["d"] <= Y1_END]),
             ("2년차 25-08~26-08", [t for t in trades if t["d"] > Y1_END]),
+            ("2026 YTD 1~8월", [t for t in trades if t["d"] >= dt.date(2026, 1, 1)]),
             ("전체 26개월", trades)]
     for name, trs in segs:
         wins = sum(1 for t in trs if t["pl"] > 0)
@@ -132,7 +133,7 @@ def main():
             e2, m2, _ = sim(trs, f, False)
             out.append(f"   {int(f*100)}%   |  ${e1:>7.0f} / {m1:4.1f}% / {n1:>2}건  ||  ${e2:>7.0f} / {m2:4.1f}%")
         out.append("")
-    out.append("거래별: " + ", ".join(f"{t['d']}({t['pl']:+.0f}%)" for t in trades))
+    out.append("거래별: " + ", ".join(f"{t['d']}({t['pl']:+.1f}%)" for t in trades))
     return out
 
 
