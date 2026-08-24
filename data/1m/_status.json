@@ -809,16 +809,32 @@
  "2025-10-30": {
   "ok": false,
   "bars": 270,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 50
+  "fails": [
+   17
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   18
+  ],
+  "tries": 47
  },
  "2025-10-29": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 48
+  "fails": [
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16
+  ],
+  "tries": 45
  },
  "2025-10-28": {
   "ok": true,
