@@ -313,6 +313,23 @@ def main():
     eta = (left / rate) if rate else 0
     log(f"누적 {ok_n}/{len(gd_all)}일 (전역 {ok_n/len(gd_all)*100:.1f}%) · 남음 {left}일 · "
         f"이 속도면 {eta:.0f}회 실행 (35분 간격 → 약 {eta*35/60:.1f}시간)")
+    # ── 자기연쇄: 잔무 남으면 자기 워크플로 재발사 (크론 드랍 대비, 새 러너 IP 확보) ──
+    if left > 5:
+        tok = os.environ.get("GH_TOKEN", "")
+        shard = os.environ.get("SHARD", "")
+        wf = {"0": "backfill.yml", "1": "backfill2.yml"}.get(shard)
+        if tok and wf:
+            try:
+                req = urllib.request.Request(
+                    f"https://api.github.com/repos/macchiatopsk-create/"
+                    f"Market-Signal/actions/workflows/{wf}/dispatches",
+                    data=json.dumps({"ref": "main"}).encode(),
+                    headers={"Authorization": f"Bearer {tok}",
+                             "Accept": "application/vnd.github+json"})
+                urllib.request.urlopen(req, timeout=15)
+                log(f"자기연쇄 재발사 OK ({wf})")
+            except Exception as e:
+                log(f"자기연쇄 실패: {e}")
     if left <= 5 and not st.get("_recheck", {}).get("fired"):
         tok = os.environ.get("GH_TOKEN", "")
         if tok:
