@@ -20,6 +20,8 @@ jobs:
         with: {python-version: "3.12"}
       - run: pip install -r requirements.txt
       - name: run selected
+        env:
+          ALPHAVANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_KEY }}
         run: |
           T="${{ github.event.inputs.target }}"
           if [ -z "$T" ]; then T="gapafter"; fi
@@ -67,6 +69,7 @@ jobs:
             minres)    run_one minres.py ;;
             minres2)   run_one minres2.py ;;
             dsize)     run_one dsize.py ;;
+            avfill)    run_one avfill.py ;;
             pollsim)   run_one pollsim.py ;;
             orbvwap)   run_one orbvwap.py ;;
             orbtrail)  run_one orbtrail.py ;;
