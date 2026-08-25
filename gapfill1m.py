@@ -252,7 +252,8 @@ def main():
     todo = sorted(todo, key=lambda g: (st.get(str(g[0]), {}).get("tries", 0),
                                        -g[0].toordinal()))  # 신규(tries=0) 우선, 그 안에선 최신 우선
     got, rep = 0, []
-    dead = 0                         # 연속 전멸일 (서킷브레이커)
+    dead = 0
+    strangled = False                         # 연속 전멸일 (서킷브레이커)
     for (d, gp, pc, rh, rl, rc) in todo:
         if time.time() - t0 > BUDGET_SEC:
             log(f"  [시간예산 초과 — {d} 이전 중단]")
@@ -286,6 +287,7 @@ def main():
                 dead += 1
                 if dead >= 6:
                     log(f"  [연속 전멸 {dead}일 — 스로틀 교살 추정, 런 조기 종료 → 다음 크론 새 IP]")
+                    strangled = True
                     break
             else:
                 dead = 0
@@ -315,6 +317,11 @@ def main():
         f"이 속도면 {eta:.0f}회 실행 (35분 간격 → 약 {eta*35/60:.1f}시간)")
     # ── 자기연쇄: 잔무 남으면 자기 워크플로 재발사 (크론 드랍 대비, 새 러너 IP 확보) ──
     if left > 5:
+        if strangled:
+            room = (t0 + BUDGET_SEC + 300) - time.time() - 120
+            cool = max(0, min(900, room))
+            log(f"교살 쿨다운 {cool:.0f}초 후 자기연쇄 (망치질 페이스 조절)")
+            time.sleep(cool)
         tok = os.environ.get("GH_TOKEN", "")
         shard = os.environ.get("SHARD", "")
         wf = {"0": "backfill.yml", "1": "backfill2.yml"}.get(shard)
