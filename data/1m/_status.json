@@ -4059,10 +4059,18 @@
  },
  "2022-03-15": {
   "ok": false,
-  "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 7
+  "bars": 0,
+  "fails": [
+   17
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   18
+  ],
+  "tries": 5
  },
  "2022-03-14": {
   "ok": false,
