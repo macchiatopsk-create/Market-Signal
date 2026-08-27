@@ -1,0 +1,54 @@
+name: backfill-1m-3
+
+on:
+  schedule:
+    - cron: "21,51 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: backfill-1m-b
+  cancel-in-progress: false
+
+jobs:
+  fill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: deps
+        run: pip install -q yfinance pandas numpy
+
+      - name: run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHARD: "2"
+        run: python gapfill1m.py
+
+      - name: persist
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data 2>/dev/null || true
+          git add gapfill1m_result.json gapfill_result.json 2>/dev/null || true
+          git commit -m "backfill-1m-s${SHARD:-x} $(date -u +%F_%H%M)" || echo none
+          for i in 1 2 3 4 5; do
+            git fetch origin main
+            git rebase origin/main -X theirs || git rebase --abort
+            python status_merge.py || true
+            git add data/1m/_status.json 2>/dev/null || true
+            git commit -m "status-merge" || true
+            git push && break || sleep $((i*5))
+          done
+        env:
+          SHARD: "2" 

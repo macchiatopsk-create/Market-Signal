@@ -236,10 +236,11 @@ def main():
     gd = gap_days()
     gd_all = gd
     shard = os.environ.get("SHARD", "")
-    if shard == "0":
-        gd = [g for g in gd if str(g[0]) >= "2023-05-01"]
-    elif shard == "1":
-        gd = [g for g in gd if str(g[0]) < "2023-05-01"]
+    _R = {"0": ("2024-01-01", "9999"), "1": ("0000", "2022-07-01"),
+          "2": ("2022-07-01", "2023-01-01"), "3": ("2023-01-01", "2024-01-01")}
+    if shard in _R:
+        lo, hi = _R[shard]
+        gd = [g for g in gd if lo <= str(g[0]) < hi]
     if shard:
         log(f"샤드 {shard}: 담당 {len(gd)}일 / 전체 {len(gd_all)}일")
     st = load_status()
@@ -316,7 +317,7 @@ def main():
     log(f"누적 {ok_n}/{len(gd_all)}일 (전역 {ok_n/len(gd_all)*100:.1f}%) · 남음 {left}일 · "
         f"이 속도면 {eta:.0f}회 실행 (35분 간격 → 약 {eta*35/60:.1f}시간)")
     # ── 자기연쇄: 잔무 남으면 자기 워크플로 재발사 (크론 드랍 대비, 새 러너 IP 확보) ──
-    if left > 5:
+    if left > 5 and got < len(todo):
         if strangled:
             room = (t0 + BUDGET_SEC + 300) - time.time() - 120
             cool = max(0, min(900, room))
