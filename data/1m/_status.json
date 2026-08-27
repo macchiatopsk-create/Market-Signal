@@ -3690,10 +3690,18 @@
  },
  "2022-06-06": {
   "ok": false,
-  "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 9
+  "bars": 0,
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 6
  },
  "2022-06-02": {
   "ok": true,
