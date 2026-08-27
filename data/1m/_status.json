@@ -4458,10 +4458,18 @@
  },
  "2022-01-03": {
   "ok": false,
-  "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 7
+  "bars": 210,
+  "fails": [
+   18,
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 4
  },
  "2021-12-28": {
   "ok": false,
