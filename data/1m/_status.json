@@ -5666,10 +5666,18 @@
  },
  "2024-01-24": {
   "ok": false,
-  "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 7
+  "bars": 0,
+  "fails": [
+   17,
+   18,
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16
+  ],
+  "tries": 4
  },
  "2024-01-22": {
   "ok": false,
