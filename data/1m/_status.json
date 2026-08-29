@@ -3621,10 +3621,18 @@
  },
  "2022-06-14": {
   "ok": false,
-  "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 18
+  "bars": 0,
+  "fails": [
+   14,
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   15,
+   16
+  ],
+  "tries": 15
  },
  "2022-06-09": {
   "ok": true,
@@ -3650,10 +3658,18 @@
  },
  "2022-06-07": {
   "ok": false,
-  "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 18
+  "bars": 0,
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 15
  },
  "2022-06-06": {
   "ok": false,
