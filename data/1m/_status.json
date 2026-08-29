@@ -5288,10 +5288,18 @@
  },
  "2024-03-20": {
   "ok": false,
-  "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 12
+  "bars": 0,
+  "fails": [
+   15,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   16,
+   17
+  ],
+  "tries": 10
  },
  "2024-03-19": {
   "ok": true,
