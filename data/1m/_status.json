@@ -3885,10 +3885,18 @@
  },
  "2022-04-08": {
   "ok": false,
-  "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 19
+  "bars": 0,
+  "fails": [
+   15,
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   16
+  ],
+  "tries": 17
  },
  "2022-04-07": {
   "ok": true,
