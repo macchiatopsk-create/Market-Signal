@@ -4244,9 +4244,17 @@
  "2022-01-31": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 17
+  "fails": [
+   18,
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 15
  },
  "2022-01-28": {
   "ok": false,
