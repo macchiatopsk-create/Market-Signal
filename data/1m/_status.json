@@ -4710,10 +4710,18 @@
  },
  "2024-06-13": {
   "ok": false,
-  "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 15
+  "bars": 0,
+  "fails": [
+   16,
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15
+  ],
+  "tries": 13
  },
  "2024-06-12": {
   "ok": false,
