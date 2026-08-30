@@ -3873,9 +3873,17 @@
  "2022-03-15": {
   "ok": false,
   "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 25
+  "fails": [
+   17
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   18
+  ],
+  "tries": 23
  },
  "2022-03-14": {
   "ok": true,
@@ -3887,9 +3895,17 @@
  "2022-03-11": {
   "ok": false,
   "bars": 210,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 25
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 23
  },
  "2022-03-10": {
   "ok": false,
