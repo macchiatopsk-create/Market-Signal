@@ -325,7 +325,8 @@ def main():
             time.sleep(cool)
         tok = os.environ.get("GH_TOKEN", "")
         shard = os.environ.get("SHARD", "")
-        wf = {"0": "backfill.yml", "1": "backfill2.yml"}.get(shard)
+        wf = {"0": "backfill.yml", "1": "backfill2.yml",
+              "2": "backfill3.yml", "3": "backfill4.yml"}.get(shard)
         if tok and wf:
             try:
                 req = urllib.request.Request(
