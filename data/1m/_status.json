@@ -4525,9 +4525,17 @@
  "2024-05-10": {
   "ok": false,
   "bars": 240,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 21
+  "fails": [
+   15,
+   16,
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14
+  ],
+  "tries": 19
  },
  "2024-05-08": {
   "ok": true,
@@ -4546,9 +4554,17 @@
  "2024-05-02": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 21
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 19
  },
  "2024-05-01": {
   "ok": true,
@@ -4601,10 +4617,18 @@
  },
  "2024-04-17": {
   "ok": false,
-  "bars": 90,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 21
+  "bars": 30,
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 18
  },
  "2024-04-15": {
   "ok": true,
@@ -4630,9 +4654,17 @@
  "2024-04-10": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 21
+  "fails": [
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16
+  ],
+  "tries": 18
  },
  "2024-04-09": {
   "ok": true,
@@ -4644,16 +4676,32 @@
  "2024-04-08": {
   "ok": false,
   "bars": 210,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 21
+  "fails": [
+   15,
+   16,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   17
+  ],
+  "tries": 18
  },
  "2024-04-05": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 21
+  "fails": [
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16
+  ],
+  "tries": 18
  },
  "2024-04-04": {
   "ok": true,
