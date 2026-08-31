@@ -3946,9 +3946,17 @@
  "2022-03-02": {
   "ok": false,
   "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 33
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 31
  },
  "2022-03-01": {
   "ok": true,
@@ -3960,9 +3968,17 @@
  "2022-02-25": {
   "ok": false,
   "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 33
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 31
  },
  "2022-02-23": {
   "ok": true,
@@ -3995,9 +4011,17 @@
  "2022-02-08": {
   "ok": false,
   "bars": 150,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 33
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 31
  },
  "2022-02-02": {
   "ok": true,
