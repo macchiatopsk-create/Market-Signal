@@ -3912,7 +3912,7 @@
    17,
    18
   ],
-  "tries": 28
+  "tries": 29
  },
  "2022-03-08": {
   "ok": true,
@@ -3941,22 +3941,14 @@
    17,
    19
   ],
-  "tries": 28
+  "tries": 29
  },
  "2022-03-02": {
   "ok": false,
   "bars": 60,
-  "fails": [
-   19
-  ],
-  "hours_ok": [
-   14,
-   15,
-   16,
-   17,
-   18
-  ],
-  "tries": 28
+  "fails": [],
+  "reason": "halfday",
+  "tries": 31
  },
  "2022-03-01": {
   "ok": true,
@@ -3968,17 +3960,9 @@
  "2022-02-25": {
   "ok": false,
   "bars": 180,
-  "fails": [
-   19
-  ],
-  "hours_ok": [
-   14,
-   15,
-   16,
-   17,
-   18
-  ],
-  "tries": 28
+  "fails": [],
+  "reason": "halfday",
+  "tries": 31
  },
  "2022-02-23": {
   "ok": true,
@@ -4011,17 +3995,9 @@
  "2022-02-08": {
   "ok": false,
   "bars": 150,
-  "fails": [
-   19
-  ],
-  "hours_ok": [
-   14,
-   15,
-   16,
-   17,
-   18
-  ],
-  "tries": 28
+  "fails": [],
+  "reason": "halfday",
+  "tries": 31
  },
  "2022-02-02": {
   "ok": true,
@@ -4040,17 +4016,9 @@
  "2022-01-31": {
   "ok": false,
   "bars": 120,
-  "fails": [
-   18,
-   19
-  ],
-  "hours_ok": [
-   14,
-   15,
-   16,
-   17
-  ],
-  "tries": 28
+  "fails": [],
+  "reason": "halfday",
+  "tries": 31
  },
  "2022-01-28": {
   "ok": true,
@@ -4076,32 +4044,16 @@
  "2022-01-20": {
   "ok": false,
   "bars": 180,
-  "fails": [
-   19
-  ],
-  "hours_ok": [
-   14,
-   15,
-   16,
-   17,
-   18
-  ],
-  "tries": 28
+  "fails": [],
+  "reason": "halfday",
+  "tries": 31
  },
  "2022-01-19": {
   "ok": false,
   "bars": 60,
-  "fails": [
-   18
-  ],
-  "hours_ok": [
-   14,
-   15,
-   16,
-   17,
-   19
-  ],
-  "tries": 28
+  "fails": [],
+  "reason": "halfday",
+  "tries": 31
  },
  "2022-01-14": {
   "ok": true,
@@ -4123,7 +4075,7 @@
    17,
    18
   ],
-  "tries": 28
+  "tries": 29
  },
  "2022-01-12": {
   "ok": true,
