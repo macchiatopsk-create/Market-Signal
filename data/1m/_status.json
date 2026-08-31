@@ -1386,9 +1386,17 @@
  "2024-10-23": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 22
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 20
  },
  "2024-10-22": {
   "ok": true,
@@ -4221,10 +4229,18 @@
  },
  "2024-08-16": {
   "ok": false,
-  "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 22
+  "bars": 60,
+  "fails": [
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16
+  ],
+  "tries": 20
  },
  "2024-08-15": {
   "ok": true,
