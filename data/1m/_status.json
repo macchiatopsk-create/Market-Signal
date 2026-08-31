@@ -4005,9 +4005,17 @@
  "2022-02-08": {
   "ok": false,
   "bars": 150,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 42
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 40
  },
  "2022-02-02": {
   "ok": true,
