@@ -672,9 +672,17 @@
  "2025-11-28": {
   "ok": false,
   "bars": 179,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 28
+  "fails": [
+   17,
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   18
+  ],
+  "tries": 26
  },
  "2025-11-26": {
   "ok": true,
@@ -742,9 +750,17 @@
  "2025-11-06": {
   "ok": false,
   "bars": 240,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 28
+  "fails": [
+   17
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   18,
+   19
+  ],
+  "tries": 26
  },
  "2025-11-03": {
   "ok": true,
@@ -778,9 +794,17 @@
  "2025-10-29": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 28
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 25
  },
  "2025-10-28": {
   "ok": true,
@@ -904,9 +928,17 @@
  "2025-09-08": {
   "ok": false,
   "bars": 30,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 28
+  "fails": [
+   13
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 25
  },
  "2025-09-05": {
   "ok": true,
@@ -1030,9 +1062,17 @@
  "2025-02-21": {
   "ok": false,
   "bars": 330,
-  "fails": [],
-  "reason": "range",
-  "tries": 26
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 25
  },
  "2025-02-13": {
   "ok": true,
@@ -1170,9 +1210,17 @@
  "2024-12-24": {
   "ok": false,
   "bars": 209,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 28
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 25
  },
  "2024-12-20": {
   "ok": true,
@@ -1338,9 +1386,17 @@
  "2024-10-23": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 28
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 25
  },
  "2024-10-22": {
   "ok": true,
@@ -1562,9 +1618,17 @@
  "2025-07-03": {
   "ok": false,
   "bars": 209,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 28
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 25
  },
  "2025-07-01": {
   "ok": true,
@@ -1807,9 +1871,17 @@
  "2025-03-14": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 28
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 25
  },
  "2025-03-07": {
   "ok": true,
@@ -4152,9 +4224,17 @@
  "2024-08-16": {
   "ok": false,
   "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 28
+  "fails": [
+   17,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16
+  ],
+  "tries": 25
  },
  "2024-08-15": {
   "ok": true,
