@@ -4186,9 +4186,17 @@
  "2021-12-21": {
   "ok": false,
   "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 32
+  "fails": [
+   17,
+   18
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   19
+  ],
+  "tries": 30
  },
  "2021-12-17": {
   "ok": true,
