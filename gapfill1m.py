@@ -229,7 +229,7 @@ def main():
         OUT.append("⏰ 워치독 발동 — 행 지점 스택:\n" + "".join(_tb.format_stack(frame))[-1500:])
         json.dump({"at": dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
                    "report": "\n".join(OUT)},
-                  open("gapfill1m_result.json", "w"), ensure_ascii=False, indent=1)
+                  open(f"gapfill1m_result_s{os.environ.get('SHARD', 'x')}.json", "w"), ensure_ascii=False, indent=1)
         os._exit(0)
     signal.signal(signal.SIGALRM, _watchdog)
     signal.alarm(BUDGET_SEC + 300)
@@ -369,4 +369,4 @@ if __name__ == "__main__":
         print(OUT[-1])
     json.dump({"at": dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
                "report": "\n".join(OUT)},
-              open("gapfill1m_result.json", "w"), ensure_ascii=False, indent=1)
+              open(f"gapfill1m_result_s{os.environ.get('SHARD', 'x')}.json", "w"), ensure_ascii=False, indent=1)
