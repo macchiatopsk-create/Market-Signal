@@ -4848,9 +4848,17 @@
  "2024-02-29": {
   "ok": false,
   "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 24
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 22
  },
  "2024-02-28": {
   "ok": true,
@@ -4869,9 +4877,17 @@
  "2024-02-23": {
   "ok": false,
   "bars": 90,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 24
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 22
  },
  "2024-02-21": {
   "ok": true,
@@ -4890,9 +4906,17 @@
  "2024-02-09": {
   "ok": false,
   "bars": 150,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 24
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   19
+  ],
+  "tries": 22
  },
  "2024-02-07": {
   "ok": true,
