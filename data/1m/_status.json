@@ -2884,9 +2884,17 @@
  "2022-10-14": {
   "ok": false,
   "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 13
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 10
  },
  "2022-10-12": {
   "ok": false,
