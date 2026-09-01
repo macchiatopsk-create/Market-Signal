@@ -4656,9 +4656,17 @@
  "2024-04-08": {
   "ok": false,
   "bars": 210,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 28
+  "fails": [
+   15,
+   16,
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   17
+  ],
+  "tries": 26
  },
  "2024-04-05": {
   "ok": false,
