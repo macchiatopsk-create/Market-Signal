@@ -4499,9 +4499,17 @@
  "2024-05-02": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 30
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 28
  },
  "2024-05-01": {
   "ok": true,
