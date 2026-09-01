@@ -299,9 +299,17 @@
  "2026-07-15": {
   "ok": false,
   "bars": 330,
-  "fails": [],
-  "reason": "range",
-  "tries": 29
+  "fails": [
+   17
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   18
+  ],
+  "tries": 28
  },
  "2026-04-07": {
   "ok": true,
@@ -635,9 +643,17 @@
  "2025-12-04": {
   "ok": false,
   "bars": 330,
-  "fails": [],
-  "reason": "range",
-  "tries": 29
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 28
  },
  "2025-12-03": {
   "ok": true,
@@ -656,9 +672,17 @@
  "2025-11-28": {
   "ok": false,
   "bars": 179,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 31
+  "fails": [
+   17,
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   18
+  ],
+  "tries": 28
  },
  "2025-11-26": {
   "ok": true,
@@ -4834,9 +4858,17 @@
  "2024-02-09": {
   "ok": false,
   "bars": 150,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 30
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   19
+  ],
+  "tries": 27
  },
  "2024-02-07": {
   "ok": true,
@@ -4868,10 +4900,18 @@
  },
  "2024-01-31": {
   "ok": false,
-  "bars": 240,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 30
+  "bars": 180,
+  "fails": [
+   17
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   18,
+   19
+  ],
+  "tries": 27
  },
  "2024-01-30": {
   "ok": true,
@@ -4896,24 +4936,48 @@
  },
  "2024-01-24": {
   "ok": false,
-  "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 30
+  "bars": 120,
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 27
  },
  "2024-01-22": {
   "ok": false,
   "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 30
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 27
  },
  "2024-01-19": {
   "ok": false,
   "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 30
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 27
  },
  "2024-01-18": {
   "ok": true,
@@ -4925,16 +4989,32 @@
  "2024-01-12": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 30
+  "fails": [
+   16,
+   17
+  ],
+  "hours_ok": [
+   14,
+   15,
+   18,
+   19
+  ],
+  "tries": 27
  },
  "2024-01-11": {
   "ok": false,
   "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 30
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 27
  },
  "2024-01-09": {
   "ok": true,
