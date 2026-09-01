@@ -4066,9 +4066,17 @@
  "2022-01-20": {
   "ok": false,
   "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 44
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 41
  },
  "2022-01-19": {
   "ok": false,
