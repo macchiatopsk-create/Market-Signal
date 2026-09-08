@@ -6036,10 +6036,18 @@
  },
  "2023-06-27": {
   "ok": false,
-  "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 13
+  "bars": 0,
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 10
  },
  "2023-06-23": {
   "ok": false,
