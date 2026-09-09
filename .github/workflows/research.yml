@@ -72,6 +72,7 @@ jobs:
             avfill)    run_one avfill.py ;;
             rsit)      run_one rsit.py ;;
             l3sig)     run_one l3sig.py ;;
+            l3full)    run_one l3full.py ;;
             pollsim)   run_one pollsim.py ;;
             orbvwap)   run_one orbvwap.py ;;
             orbtrail)  run_one orbtrail.py ;;
