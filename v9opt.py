@@ -129,6 +129,27 @@ def main():
         e, m, n = equity([dict(p0=r["p0"], pl=r["A"]) for r in rows], f)
         out.append(f"   {int(f*100)}%  최종 ${e:,.0f} · MDD {m:4.1f}% · 체결 {n}건")
     out.append("")
+    out.append("  [민감도] 옵션 B(14:30컷) · IV배수 × 스프레드  → PF / 상위2외 / 승률 / 평균")
+    for ivm_ in (1.0, 1.5, 2.0, 2.5):
+        for sp in (2.2, 5.0):
+            pls = []
+            for r in rows:
+                iv = (ivm.get(r["d"]) or (vopen.get(r["d"], 16.0) * 1.15 / 100)) * ivm_
+                g = h[h.index.date == r["d"]]
+                rt = g[(g.index.time >= dt.time(9, 30)) & (g.index.time < dt.time(16, 0))]
+                op = float(rt["Open"].iloc[0]); K = round(op * (1 - ITM_PCT / 100))
+                p0 = bsm(op, K, 6.5 / 24 / 365, iv)
+                bar = rt[rt.index.time == dt.time(14, 30)]
+                if not len(bar) or p0 <= 0.05:
+                    continue
+                px = float(bar["Open"].iloc[0])
+                pls.append(max((bsm(px, K, 1.5 / 24 / 365, iv) - p0) / p0 * 100 - sp, -100.0))
+            w = [x for x in pls if x > 0]; l = [-x for x in pls if x <= 0]
+            b = sorted(pls)[:-2]; w2 = [x for x in b if x > 0]; l2 = [-x for x in b if x <= 0]
+            pf = sum(w) / sum(l) if l else 99; pf2 = sum(w2) / sum(l2) if l2 else 99
+            out.append(f"   IV×{ivm_:.1f} 스프레드{sp:.1f}%  →  {pf:4.2f} / {pf2:4.2f} / "
+                       f"{len(w)/len(pls)*100:4.1f}% / {np.mean(pls):+6.1f}%  (평균프리미엄 계산 포함)")
+    out.append("")
     out.append(f"  평균 진입 프리미엄 ${np.mean([r['p0'] for r in rows]):.2f}/주 · "
                f"평균 기초 수익 {np.mean([r['stock'] for r in rows]):+.3f}%")
     return out
