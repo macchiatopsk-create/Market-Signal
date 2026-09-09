@@ -74,6 +74,7 @@ jobs:
             l3sig)     run_one l3sig.py ;;
             l3full)    run_one l3full.py ;;
             l3pm)      run_one l3pm.py ;;
+            v9opt)     run_one v9opt.py ;;
             pollsim)   run_one pollsim.py ;;
             orbvwap)   run_one orbvwap.py ;;
             orbtrail)  run_one orbtrail.py ;;
