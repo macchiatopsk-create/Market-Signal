@@ -4767,9 +4767,17 @@
  "2024-02-29": {
   "ok": false,
   "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 40
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 37
  },
  "2024-02-28": {
   "ok": true,
@@ -4788,9 +4796,17 @@
  "2024-02-23": {
   "ok": false,
   "bars": 90,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 40
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 37
  },
  "2024-02-21": {
   "ok": true,
@@ -4809,9 +4825,17 @@
  "2024-02-09": {
   "ok": false,
   "bars": 150,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 40
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   19
+  ],
+  "tries": 37
  },
  "2024-02-07": {
   "ok": true,
@@ -4844,9 +4868,17 @@
  "2024-01-31": {
   "ok": false,
   "bars": 240,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 40
+  "fails": [
+   17
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   18,
+   19
+  ],
+  "tries": 37
  },
  "2024-01-30": {
   "ok": true,
@@ -4872,23 +4904,47 @@
  "2024-01-24": {
   "ok": false,
   "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 40
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 37
  },
  "2024-01-22": {
   "ok": false,
   "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 40
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 37
  },
  "2024-01-19": {
   "ok": false,
   "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 40
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 37
  },
  "2024-01-18": {
   "ok": true,
@@ -4900,16 +4956,32 @@
  "2024-01-12": {
   "ok": false,
   "bars": 120,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 40
+  "fails": [
+   16,
+   17
+  ],
+  "hours_ok": [
+   14,
+   15,
+   18,
+   19
+  ],
+  "tries": 37
  },
  "2024-01-11": {
   "ok": false,
   "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 40
+  "fails": [
+   19
+  ],
+  "hours_ok": [
+   14,
+   15,
+   16,
+   17,
+   18
+  ],
+  "tries": 37
  },
  "2024-01-09": {
   "ok": true,
