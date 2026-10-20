@@ -6091,10 +6091,18 @@
  },
  "2023-05-17": {
   "ok": false,
-  "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 25
+  "bars": 0,
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 22
  },
  "2023-05-16": {
   "ok": false,
