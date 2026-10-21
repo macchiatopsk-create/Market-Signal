@@ -3442,9 +3442,17 @@
  "2022-06-14": {
   "ok": false,
   "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 121
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 118
  },
  "2022-06-09": {
   "ok": true,
