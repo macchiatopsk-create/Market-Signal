@@ -2996,9 +2996,17 @@
  "2022-09-14": {
   "ok": false,
   "bars": 240,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 60
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 57
  },
  "2022-09-12": {
   "ok": true,
