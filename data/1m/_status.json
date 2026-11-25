@@ -2982,9 +2982,17 @@
  "2022-09-14": {
   "ok": false,
   "bars": 240,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 83
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 80
  },
  "2022-09-12": {
   "ok": true,
@@ -3052,9 +3060,17 @@
  "2022-08-17": {
   "ok": false,
   "bars": 240,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 83
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 80
  },
  "2022-08-16": {
   "ok": true,
