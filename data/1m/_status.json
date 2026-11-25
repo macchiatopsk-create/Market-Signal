@@ -3326,9 +3326,17 @@
  "2022-06-14": {
   "ok": false,
   "bars": 180,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 158
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 155
  },
  "2022-06-09": {
   "ok": true,
@@ -3340,16 +3348,32 @@
  "2022-06-08": {
   "ok": false,
   "bars": 210,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 158
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 155
  },
  "2022-06-07": {
   "ok": false,
   "bars": 60,
-  "fails": [],
-  "reason": "halfday",
-  "tries": 158
+  "fails": [
+   18
+  ],
+  "hours_ok": [
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "tries": 155
  },
  "2022-06-06": {
   "ok": false,
